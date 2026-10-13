@@ -287,6 +287,7 @@ OAuth Management:
 
 - View auth status for all OAuth-enabled remote servers
 - Start OAuth login for selected server
+- Show login success only after the connection test passes; otherwise show the test error
 - Automatically refresh expiring tokens when a refresh token is available
 - Revoke tokens per server
 - Login all OAuth-enabled servers in sequence

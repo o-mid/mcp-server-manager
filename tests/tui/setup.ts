@@ -173,6 +173,7 @@ export const mockDaemonService = {
 };
 
 export const mockAuthService = {
+  ensureValidToken: vi.fn(() => Promise.resolve(false)),
   hasValidToken: vi.fn(() => false),
   isTokenExpired: vi.fn(() => false),
   isRefreshable: vi.fn(() => false),

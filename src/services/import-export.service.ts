@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { getConfigService } from "./config.service.js";
 import { getClientService } from "./client.service.js";
+import { applyPrivateMode, PRIVATE_FILE_MODE } from "../shared/secure-storage.js";
 import type { LocalServer, RemoteServer, Result, TransportType, ClientId } from "../types/index.js";
 import type {
   ServerConflict,
@@ -723,7 +724,8 @@ export class ImportExportService {
       const exported = this.export(format);
       const output = JSON.stringify(exported, null, 2);
       const resolvedPath = path.resolve(filePath);
-      fs.writeFileSync(resolvedPath, output);
+      fs.writeFileSync(resolvedPath, output, { mode: PRIVATE_FILE_MODE });
+      applyPrivateMode(resolvedPath, PRIVATE_FILE_MODE);
       return { success: true };
     } catch (e) {
       return { success: false, error: e instanceof Error ? e.message : String(e) };

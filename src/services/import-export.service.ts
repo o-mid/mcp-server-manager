@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import { getConfigService } from "./config.service.js";
 import { getClientService } from "./client.service.js";
-import { writePrivateFile } from "../shared/secure-storage.js";
+import { applyPrivateMode, PRIVATE_FILE_MODE } from "../shared/secure-storage.js";
 import type { LocalServer, RemoteServer, Result, TransportType, ClientId } from "../types/index.js";
 import type {
   ServerConflict,
@@ -724,9 +724,8 @@ export class ImportExportService {
       const exported = this.export(format);
       const output = JSON.stringify(exported, null, 2);
       const resolvedPath = path.resolve(filePath);
-      // The export carries env, headers and bearerToken verbatim, so it is written with the same
-      // 0600 helper PR #85 introduced for config, settings, profiles and OAuth tokens.
-      writePrivateFile(resolvedPath, output);
+      fs.writeFileSync(resolvedPath, output, { mode: PRIVATE_FILE_MODE });
+      applyPrivateMode(resolvedPath, PRIVATE_FILE_MODE);
       return { success: true };
     } catch (e) {
       return { success: false, error: e instanceof Error ? e.message : String(e) };

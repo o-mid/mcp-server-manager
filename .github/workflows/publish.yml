@@ -75,7 +75,8 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Install npm with trusted publishing support
+        run: npm install --global npm@11
+
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public

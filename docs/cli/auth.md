@@ -62,6 +62,7 @@ mcpsm auth login <server> [--no-browser]
 
 - Opens a browser by default; use `--no-browser` to copy the URL manually.
 - Requires the server to have OAuth enabled (`mcpsm server update <id> --oauth`).
+- OAuth completion and connection verification are reported separately. A completed login can still fail the connection test.
 
 ---
 
@@ -104,6 +105,11 @@ mcpsm auth refresh <server>
 OAuth tokens are stored as local JSON in:
 
 - `~/.mcp-manager/oauth-tokens.json`
+
+Each token update reads the latest file and changes only that server's entry.
+Refresh results are discarded if the server's credentials changed during the request.
+OAuth logs include the server ID, process ID, expiry time, and refresh failure status
+and error code, without token values. Daemon logs are in `~/.mcp-manager/logs/gateway.log`.
 
 On macOS and Linux, mcpsm creates the config directory with `0700`
 permissions and writes OAuth token files with `0600` permissions. Existing

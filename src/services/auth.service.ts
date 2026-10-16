@@ -151,6 +151,8 @@ export class AuthService {
         const data = fs.readFileSync(this.tokensPath, "utf8");
         const parsed = JSON.parse(data) as Record<string, StoredOAuthTokens>;
         this.tokens = new Map(Object.entries(parsed));
+      } else {
+        this.tokens.clear();
       }
     } catch (error) {
       log.debug("Failed to load OAuth tokens:", error);
@@ -158,14 +160,45 @@ export class AuthService {
     }
   }
 
-  /** Save tokens to disk */
-  private saveTokens(): void {
-    try {
-      const data = Object.fromEntries(this.tokens);
-      writePrivateJsonFile(this.tokensPath, data);
-    } catch (error) {
-      log.debug("Failed to save OAuth tokens:", error);
+  private saveTokens(
+    serverId: string,
+    tokens: StoredOAuthTokens | null,
+    expectedTokens?: StoredOAuthTokens | null
+  ): boolean {
+    const latestTokens = new Map<string, StoredOAuthTokens>(
+      fs.existsSync(this.tokensPath)
+        ? Object.entries(JSON.parse(fs.readFileSync(this.tokensPath, "utf8")))
+        : []
+    );
+    if (
+      expectedTokens !== undefined &&
+      JSON.stringify(latestTokens.get(serverId) ?? null) !== JSON.stringify(expectedTokens)
+    ) {
+      log.warn(
+        `Discarding stale OAuth refresh for ${serverId} (pid=${process.pid}); credentials changed on disk`
+      );
+      this.loadTokens();
+      return false;
     }
+
+    if (tokens) {
+      latestTokens.set(serverId, tokens);
+    } else {
+      latestTokens.delete(serverId);
+    }
+
+    const tempPath = `${this.tokensPath}.${crypto.randomUUID()}.tmp`;
+    try {
+      writePrivateJsonFile(tempPath, Object.fromEntries(latestTokens));
+      fs.renameSync(tempPath, this.tokensPath);
+    } finally {
+      fs.rmSync(tempPath, { force: true });
+    }
+    this.tokens = latestTokens;
+    log.debug(
+      `OAuth credentials ${tokens ? "saved" : "removed"} for ${serverId} (pid=${process.pid}, expiresAt=${tokens?.expiresAt ?? "none"})`
+    );
+    return true;
   }
 
   /** Load pending authorizations from disk */
@@ -629,14 +662,15 @@ export class AuthService {
           : undefined,
       };
 
-      this.tokens.set(pendingAuth.serverId, storedTokens);
-      this.saveTokens();
+      this.saveTokensForServer(pendingAuth.serverId, storedTokens);
 
       // Clean up pending auth
       this.pendingAuths.delete(state);
       this.savePendingAuths();
 
-      log.debug(`Successfully authenticated server: ${pendingAuth.serverId}`);
+      log.info(
+        `OAuth login saved for ${pendingAuth.serverId} (pid=${process.pid}, expiresAt=${storedTokens.expiresAt ?? "none"})`
+      );
 
       return {
         success: true,
@@ -785,7 +819,7 @@ export class AuthService {
 
       const serverId = initialPendingAuth.serverId;
       // Track the token state before auth started
-      const tokenBeforeAuth = this.tokens.get(serverId)?.accessToken;
+      const tokenBeforeAuth = this.getToken(serverId)?.accessToken;
 
       const checkAuth = (): void => {
         // Check if auth is still pending
@@ -794,7 +828,7 @@ export class AuthService {
         if (!pendingAuth) {
           // Auth completed (either success or failure)
           // Check if we have a NEW token for this specific server
-          const currentToken = this.tokens.get(serverId);
+          const currentToken = this.getToken(serverId);
           if (currentToken?.accessToken && currentToken.accessToken !== tokenBeforeAuth) {
             // New token was added - success
             resolve({
@@ -830,20 +864,20 @@ export class AuthService {
 
   /** Get stored token for a server */
   getToken(serverId: string): StoredOAuthTokens | null {
+    this.loadTokens();
     return this.tokens.get(serverId) || null;
   }
 
   /** Save/overwrite stored tokens for a server */
   saveTokensForServer(serverId: string, tokens: StoredOAuthTokens): void {
-    this.tokens.set(serverId, tokens);
-    this.saveTokens();
+    this.saveTokens(serverId, tokens);
     // Note: proactive refresh rescheduling requires a RemoteServer object,
     // so it's handled by the caller or by scheduleRefreshForServer() directly.
   }
 
   /** Get valid access token for a server (refreshes if needed) */
   async getValidToken(server: RemoteServer): Promise<string | null> {
-    const stored = this.tokens.get(server.id);
+    const stored = this.getToken(server.id);
     if (!stored) {
       return null;
     }
@@ -852,7 +886,7 @@ export class AuthService {
     if (stored.expiresAt && stored.expiresAt - Date.now() < TOKEN_REFRESH_THRESHOLD_MS) {
       if (stored.refreshToken) {
         // Try to refresh the token
-        const refreshed = await this.refreshToken(server, stored);
+        const refreshed = await this.refreshTokenWithMutex(server, stored);
         if (refreshed) {
           return refreshed.accessToken;
         }
@@ -870,6 +904,14 @@ export class AuthService {
     stored: StoredOAuthTokens
   ): Promise<StoredOAuthTokens | null> {
     if (!stored.refreshToken) {
+      return null;
+    }
+
+    const tokenBeforeRefresh = this.getToken(server.id);
+    if (!tokenBeforeRefresh) {
+      log.debug(
+        `Skipping OAuth refresh for ${server.id} (pid=${process.pid}); no saved credentials`
+      );
       return null;
     }
 
@@ -906,7 +948,18 @@ export class AuthService {
       });
 
       if (!response.ok) {
-        log.debug("Token refresh failed:", response.status);
+        const failure: unknown = await response.json().catch(() => null);
+        const oauthError =
+          failure &&
+          typeof failure === "object" &&
+          "error" in failure &&
+          typeof failure.error === "string" &&
+          /^[a-z_]{1,64}$/.test(failure.error)
+            ? failure.error
+            : "unknown";
+        log.warn(
+          `OAuth refresh failed for ${server.id} (pid=${process.pid}, status=${response.status}, error=${oauthError})`
+        );
         return null;
       }
 
@@ -924,8 +977,9 @@ export class AuthService {
           : undefined,
       };
 
-      this.tokens.set(server.id, newTokens);
-      this.saveTokens();
+      if (!this.saveTokens(server.id, newTokens, tokenBeforeRefresh)) {
+        return this.getToken(server.id);
+      }
 
       return newTokens;
     } catch (error) {
@@ -961,7 +1015,7 @@ export class AuthService {
    * Returns true if the server has a valid (or freshly refreshed) token.
    */
   async ensureValidToken(server: RemoteServer): Promise<boolean> {
-    const stored = this.tokens.get(server.id);
+    const stored = this.getToken(server.id);
     if (!stored) {
       return false;
     }
@@ -1022,7 +1076,7 @@ export class AuthService {
     }
     this.refreshRetryCounts.delete(server.id);
 
-    const stored = this.tokens.get(server.id);
+    const stored = this.getToken(server.id);
     if (!stored?.refreshToken || !stored.expiresAt) {
       return;
     }
@@ -1050,7 +1104,7 @@ export class AuthService {
     server: RemoteServer,
     onRefreshed?: (serverId: string) => void
   ): Promise<void> {
-    const stored = this.tokens.get(server.id);
+    const stored = this.getToken(server.id);
     if (!stored?.refreshToken) {
       log.debug(`No refresh token for ${server.name}, skipping proactive refresh`);
       return;
@@ -1112,7 +1166,7 @@ export class AuthService {
 
   /** Check if a server has valid OAuth tokens */
   hasValidToken(serverId: string): boolean {
-    const stored = this.tokens.get(serverId);
+    const stored = this.getToken(serverId);
     if (!stored) {
       return false;
     }
@@ -1127,24 +1181,25 @@ export class AuthService {
 
   /** Remove token for a server */
   removeToken(serverId: string): void {
-    this.tokens.delete(serverId);
-    this.saveTokens();
+    this.saveTokens(serverId, null);
+    log.info(`OAuth credentials removed for ${serverId} (pid=${process.pid})`);
   }
 
   /** Clear all tokens */
   clearAllTokens(): void {
     this.tokens.clear();
-    this.saveTokens();
+    writePrivateJsonFile(this.tokensPath, {});
   }
 
   /** Get all server IDs that have stored OAuth tokens */
   getAllStoredTokenServerIds(): string[] {
+    this.loadTokens();
     return Array.from(this.tokens.keys());
   }
 
   /** Get token preview (masked) */
   getTokenPreview(serverId: string): string | null {
-    const stored = this.tokens.get(serverId);
+    const stored = this.getToken(serverId);
     if (!stored) {
       return null;
     }
@@ -1159,7 +1214,7 @@ export class AuthService {
 
   /** Check if token is expired */
   isTokenExpired(serverId: string): boolean {
-    const stored = this.tokens.get(serverId);
+    const stored = this.getToken(serverId);
     if (!stored || !stored.expiresAt) {
       return false;
     }
@@ -1169,7 +1224,7 @@ export class AuthService {
 
   /** Check if token is expired but can be refreshed */
   isRefreshable(serverId: string): boolean {
-    const stored = this.tokens.get(serverId);
+    const stored = this.getToken(serverId);
     if (!stored) {
       return false;
     }

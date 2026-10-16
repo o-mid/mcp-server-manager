@@ -331,7 +331,7 @@ describe("AuthService unit coverage", () => {
     internals.pendingAuths.set("state", pendingAuth({ createdAt: 1_000 }));
 
     const success = service.waitForAuth("state", 2_000);
-    internals.tokens.set("remote", token({ accessToken: "new-access" }));
+    service.saveTokensForServer("remote", token({ accessToken: "new-access" }));
     internals.pendingAuths.delete("state");
     await vi.advanceTimersByTimeAsync(500);
     await expect(success).resolves.toMatchObject({
@@ -423,6 +423,8 @@ describe("AuthService unit coverage", () => {
     await expect(
       service.refreshToken(server, token({ refreshToken: undefined }))
     ).resolves.toBeNull();
+
+    service.saveTokensForServer(server.id, token());
 
     vi.spyOn(service, "discoverAuthServer").mockResolvedValueOnce(null);
     await expect(service.refreshToken(server, token())).resolves.toBeNull();

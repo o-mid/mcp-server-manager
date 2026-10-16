@@ -91,7 +91,6 @@ export function AuthScreen({
     for (const server of allRemoteServers) {
       const token = authService.getToken(server.id);
       const isExpired = authService.isTokenExpired(server.id);
-      const isRefreshable = authService.isRefreshable(server.id);
       const hasStoredToken = storedTokenServerIds.includes(server.id);
       const isOAuthEnabled = server.oauth?.enabled || false;
       const isBearerOnly = !isOAuthEnabled;
@@ -114,7 +113,7 @@ export function AuthScreen({
 
       const needsAuth =
         (!hasToken && isOAuthEnabled) ||
-        (isExpired && !isRefreshable) ||
+        isExpired ||
         requiresAuth;
 
       const status: AuthStatus = {
@@ -122,6 +121,7 @@ export function AuthScreen({
         serverName: server.name,
         hasToken: hasToken || hasStoredToken,
         isOAuth: isOAuthEnabled || hasStoredToken,
+        isExpired,
         expiresAt: token?.expiresAt,
         tokenPreview:
           hasToken || hasStoredToken ? authService.getTokenPreview(server.id) || undefined : undefined,
@@ -214,7 +214,27 @@ export function AuthScreen({
 
       if (authResult.success) {
         // Re-test to verify and get tools
-        await testingService.testRemoteServer(server);
+        const verification = await testingService.testRemoteServer(server);
+        if (!verification.success) {
+          const error = `OAuth login completed, but connection test failed: ${verification.error || "Unknown error"}`;
+          setAllServers((prev) =>
+            prev.map((s) =>
+              s.server.id === server.id
+                ? {
+                    ...s,
+                    phase: "error" as AuthPhase,
+                    error,
+                    status: { ...s.status, requiresAuth: verification.requiresAuth || false },
+                  }
+                : s
+            )
+          );
+          setMessage(error);
+          onAuthComplete?.(server.id, false);
+          refreshDaemonIfRunning("authentication");
+          setCurrentAuthServer(null);
+          return;
+        }
 
         setAllServers((prev) =>
           prev.map((s) =>

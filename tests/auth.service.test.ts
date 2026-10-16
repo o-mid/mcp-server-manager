@@ -74,6 +74,83 @@ describe("AuthService", () => {
     expect(reloaded.isTokenExpired("srv")).toBe(false);
   });
 
+  it.each(["login", "revoke"])(
+    "preserves a Datadog %s when another instance saves WorkOS",
+    (action) => {
+      const old = {
+        accessToken: "old",
+        refreshToken: "old-refresh",
+        tokenType: "Bearer",
+        expiresAt: 1,
+      };
+      const fresh = {
+        ...old,
+        accessToken: "fresh",
+        refreshToken: "fresh-refresh",
+        expiresAt: Date.now() + 3600000,
+      };
+      service.saveTokensForServer("datadog", old);
+      const daemon = new AuthService(configDir);
+      service.removeToken("datadog");
+      if (action === "login") service.saveTokensForServer("datadog", fresh);
+
+      daemon.saveTokensForServer("workos", fresh);
+      expect(new AuthService(configDir).getToken("datadog")).toEqual(
+        action === "login" ? fresh : null
+      );
+      expect(daemon.getToken("datadog")).toEqual(action === "login" ? fresh : null);
+      expect(service.getToken("workos")).toEqual(fresh);
+    }
+  );
+
+  it.each(["login", "revoke"])(
+    "discards a refresh response after a concurrent %s",
+    async (action) => {
+      const stored = { accessToken: "old", refreshToken: "old-refresh", tokenType: "Bearer" };
+      const fresh = { ...stored, accessToken: "fresh", refreshToken: "fresh-refresh" };
+      const server = {
+        id: "datadog",
+        name: "Datadog",
+        type: "http",
+        url: "https://mcp.test",
+      } satisfies RemoteServer;
+      service.saveTokensForServer(server.id, stored);
+      const other = new AuthService(configDir);
+      vi.spyOn(service, "discoverAuthServer").mockResolvedValue({
+        metadata: {
+          issuer: "https://auth.test",
+          authorization_endpoint: "https://auth.test/authorize",
+          token_endpoint: "https://auth.test/token",
+        },
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          if (action === "login") other.saveTokensForServer(server.id, fresh);
+          else other.removeToken(server.id);
+          return new globalThis.Response(
+            JSON.stringify({ access_token: "stale-refresh-result", token_type: "Bearer" }),
+            { status: 200 }
+          );
+        })
+      );
+
+      expect(await service.refreshToken(server, stored)).toEqual(action === "login" ? fresh : null);
+      expect(new AuthService(configDir).getToken(server.id)).toEqual(
+        action === "login" ? fresh : null
+      );
+    }
+  );
+
+  it("does not overwrite an unreadable token file", () => {
+    const tokensPath = path.join(configDir, "oauth-tokens.json");
+    fs.writeFileSync(tokensPath, "broken-json");
+    expect(() =>
+      service.saveTokensForServer("workos", { accessToken: "fresh", tokenType: "Bearer" })
+    ).toThrow();
+    expect(fs.readFileSync(tokensPath, "utf8")).toBe("broken-json");
+  });
+
   it("stores OAuth tokens and pending auth state with private permissions", async () => {
     if (process.platform === "win32") return;
 
@@ -219,6 +296,7 @@ describe("AuthService", () => {
       refreshToken: "old-refresh",
       tokenType: "Bearer",
     };
+    service.saveTokensForServer(server.id, stored);
 
     // Stub discovery + fetch to avoid network calls
     vi.stubGlobal(

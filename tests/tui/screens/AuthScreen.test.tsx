@@ -66,11 +66,58 @@ describe("AuthScreen", () => {
     expect(mockAuthService.removeToken).toHaveBeenCalledWith(sampleRemoteServers[0].id);
   });
 
+  it("reports connection failure after OAuth completes instead of login success", async () => {
+    mockConfigService.getRemoteServers.mockReturnValue([
+      { ...sampleRemoteServers[0], oauth: { enabled: true } },
+    ]);
+    mockAuthService.getToken.mockReturnValue(null);
+    mockAuthService.startOAuthFlow.mockResolvedValue({ authUrl: "https://auth", state: "state" });
+    mockAuthService.waitForAuth.mockResolvedValue({ success: true });
+    mockTestingService.testRemoteServer.mockResolvedValue({
+      success: false,
+      toolCount: 0,
+      error: "HTTP 401",
+    });
+    const onAuthComplete = vi.fn();
+    const { stdin, lastFrame } = render(
+      <AuthScreen onBack={() => {}} onAuthComplete={onAuthComplete} />
+    );
+    await waitForStateUpdate();
+    stdin.write("a");
+    await waitForStateUpdate(300);
+
+    expect(lastFrame()).toContain("connection test failed: HTTP 401");
+    expect(lastFrame()).not.toContain("authenticated successfully");
+    expect(onAuthComplete).toHaveBeenCalledWith(sampleRemoteServers[0].id, false);
+  });
+
   it("goes back on ESC", async () => {
     const onBack = vi.fn();
     const { stdin } = render(<AuthScreen onBack={onBack} />);
     await waitForStateUpdate();
     stdin.write(KEYS.ESCAPE);
     expect(onBack).toHaveBeenCalled();
+  });
+
+  it("allows login when an expired token has a refresh token but refresh fails", async () => {
+    mockConfigService.getRemoteServers.mockReturnValue([
+      { ...sampleRemoteServers[0], oauth: { enabled: true } },
+    ]);
+    mockAuthService.getToken.mockReturnValue({
+      accessToken: "expired",
+      refreshToken: "expired-refresh",
+      tokenType: "Bearer",
+    });
+    mockAuthService.isTokenExpired.mockReturnValue(true);
+    mockAuthService.isRefreshable.mockReturnValue(true);
+    mockAuthService.ensureValidToken.mockResolvedValue(false);
+    mockAuthService.startOAuthFlow.mockResolvedValue(null);
+    const { stdin, lastFrame } = render(<AuthScreen onBack={() => {}} />);
+    await waitForStateUpdate();
+
+    expect(lastFrame()).toContain("requires authentication");
+    stdin.write(KEYS.ENTER);
+    await waitForStateUpdate();
+    expect(mockAuthService.startOAuthFlow).toHaveBeenCalled();
   });
 });

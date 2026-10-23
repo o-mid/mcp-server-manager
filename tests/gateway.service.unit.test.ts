@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import net from "net";
+import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { LocalServer, RemoteServer } from "../src/types/index.js";
 
 const sdkMocks = vi.hoisted(() => {
@@ -376,6 +377,48 @@ describe("GatewayService unit coverage", () => {
     expect(sdkMocks.stdioTransports[0].close).toHaveBeenCalled();
     expect(sdkMocks.httpTransports[0].close).toHaveBeenCalled();
     expect(sdkMocks.sseTransports[0].close).toHaveBeenCalled();
+  });
+
+  it("prefixes tool titles with the server name", async () => {
+    const port = await getFreePort();
+    const remote = remoteServer({ name: "datadog" });
+    serviceMocks.configService.getPort.mockReturnValue(port);
+    serviceMocks.configService.getSelectionState.mockReturnValue({
+      local: [],
+      remote: [`remote:${remote.id}`],
+    });
+    serviceMocks.configService.getLocalServers.mockReturnValue([]);
+    serviceMocks.configService.getRemoteServers.mockReturnValue([remote]);
+    serviceMocks.configService.getToolFilters.mockReturnValue({});
+    serviceMocks.profileService.list.mockReturnValue([{ id: "investigate" }]);
+    serviceMocks.profileService.getProfile.mockReturnValue({
+      id: "investigate",
+      servers: [],
+      remoteServers: [remote.id],
+    });
+    sdkMocks.listToolsResults.push({
+      tools: [
+        {
+          name: "search_datadog_metrics",
+          annotations: { title: "List Metrics", readOnlyHint: true },
+        },
+        { name: "get_trace", title: "Get Trace" },
+        { name: "untitled" },
+      ],
+    });
+
+    await expect(startGateway()).resolves.toEqual({ success: true });
+    await fetch(`http://127.0.0.1:${port}/mcp/investigate`, { method: "POST" });
+
+    const listTools = sdkMocks.serverInstances[0].handlers.get(ListToolsRequestSchema);
+    expect(listTools().tools).toEqual([
+      expect.objectContaining({
+        name: "datadog__search_datadog_metrics",
+        annotations: { title: "[datadog] List Metrics", readOnlyHint: true },
+      }),
+      expect.objectContaining({ name: "datadog__get_trace", title: "[datadog] Get Trace" }),
+      { name: "datadog__untitled", description: "[datadog] " },
+    ]);
   });
 
   it("starts with zero tools when no servers are selected", async () => {

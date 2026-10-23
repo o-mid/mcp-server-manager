@@ -315,6 +315,28 @@ async function connectRemoteServer(server: RemoteServer): Promise<ConnectedServe
   }
 }
 
+function prefixTool(serverName: string, tool: Tool): Tool {
+  const prefixedTool: Tool = {
+    ...tool,
+    name: `${serverName}__${tool.name}`,
+    description: `[${serverName}] ${tool.description || ""}`,
+  };
+
+  // Clients display title over name, so titles need the prefix too
+  if (tool.title) {
+    prefixedTool.title = `[${serverName}] ${tool.title}`;
+  }
+
+  if (tool.annotations?.title) {
+    prefixedTool.annotations = {
+      ...tool.annotations,
+      title: `[${serverName}] ${tool.annotations.title}`,
+    };
+  }
+
+  return prefixedTool;
+}
+
 /**
  * Build the aggregated tool list and tool-to-server mapping
  */
@@ -325,11 +347,7 @@ function buildToolMapping(): Tool[] {
   for (const [serverId, server] of gatewayState.connectedServers) {
     for (const tool of server.tools) {
       // Prefix tool name with server name to avoid conflicts
-      const prefixedTool: Tool = {
-        ...tool,
-        name: `${server.name}__${tool.name}`,
-        description: `[${server.name}] ${tool.description || ""}`,
-      };
+      const prefixedTool = prefixTool(server.name, tool);
 
       allTools.push(prefixedTool);
       gatewayState.toolToServerMap.set(prefixedTool.name, serverId);
@@ -375,11 +393,7 @@ function buildProfileView(profileId: string): ProfileView | null {
     if (profileServerIds && !profileServerIds.has(serverId)) continue;
 
     for (const tool of server.tools) {
-      const prefixedTool: Tool = {
-        ...tool,
-        name: `${server.name}__${tool.name}`,
-        description: `[${server.name}] ${tool.description || ""}`,
-      };
+      const prefixedTool = prefixTool(server.name, tool);
       tools.push(prefixedTool);
       toolMap.set(prefixedTool.name, serverId);
     }

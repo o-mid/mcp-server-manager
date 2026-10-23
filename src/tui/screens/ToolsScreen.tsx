@@ -53,6 +53,10 @@ function buildRows(filter: ServerToolFilter | null): ToolRow[] {
   return [...groups, ...tools];
 }
 
+function getRowKey(row: ToolRow): string {
+  return row.type === "group" ? `group:${row.kind}` : `tool:${row.name}`;
+}
+
 export function ToolsScreen({ onBack, initialServerId }: ToolsScreenProps): React.ReactElement {
   const { theme } = useTheme();
   const configService = getConfigService();
@@ -106,12 +110,22 @@ export function ToolsScreen({ onBack, initialServerId }: ToolsScreenProps): Reac
       const toolFilters = configService.getToolFilters();
       const filter = state.serverId ? toolFilters[state.serverId] || null : null;
 
-      setState((prev) => ({
-        ...prev,
-        filter,
-        tools: filter?.allTools || [],
-        currentToolIndex: preserveIndex ? prev.currentToolIndex : 0,
-      }));
+      setState((prev) => {
+        const nextRows = buildRows(filter);
+        const selectedRow = buildRows(prev.filter)[prev.currentToolIndex];
+        const selectedIndex = selectedRow
+          ? nextRows.findIndex((row) => getRowKey(row) === getRowKey(selectedRow))
+          : -1;
+        const preservedIndex =
+          selectedIndex >= 0 ? selectedIndex : Math.min(prev.currentToolIndex, nextRows.length - 1);
+
+        return {
+          ...prev,
+          filter,
+          tools: filter?.allTools || [],
+          currentToolIndex: preserveIndex ? Math.max(preservedIndex, 0) : 0,
+        };
+      });
     },
     [state.serverId, configService]
   );
@@ -291,6 +305,8 @@ export function ToolsScreen({ onBack, initialServerId }: ToolsScreenProps): Reac
     // Toggle tool or whole group - Space
     if (input === " " && rows.length > 0 && serverId) {
       const row = rows[currentToolIndex];
+      if (!row) return;
+
       if (row.type === "group") {
         const disabled = new Set(state.filter?.disabledTools || []);
         const allEnabled = row.names.every((name) => !disabled.has(name));

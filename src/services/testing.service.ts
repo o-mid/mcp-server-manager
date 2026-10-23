@@ -113,7 +113,7 @@ export class TestingService {
     let filter = configService.getServerToolFilter(filterId);
 
     if (!filter) {
-      filter = { enabled: [], allTools: [], toolsData: {} };
+      filter = { allTools: [], toolsData: {} };
     }
 
     if (error) {
@@ -145,7 +145,6 @@ export class TestingService {
 
     configService.setServerToolFilter(filterId, {
       allTools: toolNames,
-      enabled: !filter.enabled || filter.enabled.length === 0 ? [...toolNames] : filter.enabled,
       disabledTools: preservedDisabledTools,
       toolsData,
       totalTokens,

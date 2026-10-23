@@ -65,10 +65,8 @@ export function registerToolsCommands(program: Command): void {
           return;
         }
 
-        const enabledSet = new Set(filter.enabled || filter.allTools);
         const disabledSet = new Set(filter.disabledTools || []);
-        const isToolEnabled = (name: string): boolean =>
-          enabledSet.has(name) && !disabledSet.has(name);
+        const isToolEnabled = (name: string): boolean => !disabledSet.has(name);
 
         if (options.json) {
           outputJson({
@@ -131,8 +129,7 @@ export function registerToolsCommands(program: Command): void {
               id: s.id,
               type: "stdio",
               toolCount: toolFilters[s.id]?.allTools?.length || 0,
-              enabledCount:
-                toolFilters[s.id]?.enabled?.length ?? toolFilters[s.id]?.allTools?.length ?? 0,
+              enabledCount: configService.getEnabledTools(s.id).length,
               totalTokens: toolFilters[s.id]?.totalTokens || 0,
             })),
             ...remoteServers.map((s) => ({
@@ -140,10 +137,7 @@ export function registerToolsCommands(program: Command): void {
               id: s.id,
               type: s.type,
               toolCount: toolFilters[`remote:${s.id}`]?.allTools?.length || 0,
-              enabledCount:
-                toolFilters[`remote:${s.id}`]?.enabled?.length ??
-                toolFilters[`remote:${s.id}`]?.allTools?.length ??
-                0,
+              enabledCount: configService.getEnabledTools(`remote:${s.id}`).length,
               totalTokens: toolFilters[`remote:${s.id}`]?.totalTokens || 0,
             })),
           ],
@@ -163,7 +157,7 @@ export function registerToolsCommands(program: Command): void {
         for (const server of localServers) {
           const filter = toolFilters[server.id];
           const toolCount = filter?.allTools?.length || 0;
-          const enabledCount = filter?.enabled?.length ?? toolCount;
+          const enabledCount = configService.getEnabledTools(server.id).length;
           const tokens = filter?.totalTokens
             ? ` · ${colors.magenta}${formatTokens(filter.totalTokens)}${colors.reset}`
             : "";
@@ -182,7 +176,7 @@ export function registerToolsCommands(program: Command): void {
         for (const server of remoteServers) {
           const filter = toolFilters[`remote:${server.id}`];
           const toolCount = filter?.allTools?.length || 0;
-          const enabledCount = filter?.enabled?.length ?? toolCount;
+          const enabledCount = configService.getEnabledTools(`remote:${server.id}`).length;
           const tokens = filter?.totalTokens
             ? ` · ${colors.magenta}${formatTokens(filter.totalTokens)}${colors.reset}`
             : "";
@@ -269,11 +263,7 @@ export function registerToolsCommands(program: Command): void {
       }
 
       if (options.all || !toolName) {
-        // Enable all tools
-        configService.setServerToolFilter(filterId, {
-          ...filter,
-          enabled: [...filter.allTools],
-        });
+        configService.enableAllTools(filterId);
         await refreshDaemonIfRunning();
         console.log(
           `${c.checkmark} Enabled all ${filter.allTools.length} tools for '${server.name}'`
@@ -288,17 +278,12 @@ export function registerToolsCommands(program: Command): void {
         process.exit(1);
       }
 
-      const enabled = new Set(filter.enabled || []);
-      if (enabled.has(toolName)) {
+      if (configService.isToolEnabled(filterId, toolName)) {
         console.log(`${colors.yellow}Tool '${toolName}' is already enabled${colors.reset}`);
         return;
       }
 
-      enabled.add(toolName);
-      configService.setServerToolFilter(filterId, {
-        ...filter,
-        enabled: Array.from(enabled),
-      });
+      configService.enableTool(filterId, toolName);
       await refreshDaemonIfRunning();
 
       console.log(`${c.checkmark} Enabled tool '${toolName}' for '${server.name}'`);
@@ -343,11 +328,7 @@ export function registerToolsCommands(program: Command): void {
       }
 
       if (options.all) {
-        // Disable all tools
-        configService.setServerToolFilter(filterId, {
-          ...filter,
-          enabled: [],
-        });
+        configService.disableAllTools(filterId);
         await refreshDaemonIfRunning();
         console.log(`${c.checkmark} Disabled all tools for '${server.name}'`);
         return;
@@ -367,17 +348,12 @@ export function registerToolsCommands(program: Command): void {
         process.exit(1);
       }
 
-      const enabled = new Set(filter.enabled || filter.allTools);
-      if (!enabled.has(toolName)) {
+      if (!configService.isToolEnabled(filterId, toolName)) {
         console.log(`${colors.yellow}Tool '${toolName}' is already disabled${colors.reset}`);
         return;
       }
 
-      enabled.delete(toolName);
-      configService.setServerToolFilter(filterId, {
-        ...filter,
-        enabled: Array.from(enabled),
-      });
+      configService.disableTool(filterId, toolName);
       await refreshDaemonIfRunning();
 
       console.log(`${c.checkmark} Disabled tool '${toolName}' for '${server.name}'`);

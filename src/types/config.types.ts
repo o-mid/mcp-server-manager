@@ -30,8 +30,6 @@ export interface ToolData {
 
 /** Tool filter for a single server */
 export interface ServerToolFilter {
-  /** List of enabled tool names */
-  enabled?: string[];
   /** List of disabled tool names (tools to exclude) */
   disabledTools?: string[];
   /** List of all discovered tool names */

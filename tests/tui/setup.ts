@@ -33,6 +33,7 @@ export const mockConfigService = {
   removeRemoteServer: vi.fn(() => ({ success: true })),
   updateLocalServer: vi.fn(() => ({ success: true })),
   updateRemoteServer: vi.fn(() => ({ success: true })),
+  findServer: vi.fn(),
   toggleTool: vi.fn(),
   setToolsEnabled: vi.fn(),
   enableAllTools: vi.fn(),
@@ -47,6 +48,7 @@ export const mockConfigService = {
 
 // Mock testing service
 export const mockTestingService = {
+  testServer: vi.fn(() => Promise.resolve({ success: true, toolCount: 0 })),
   testLocalServer: vi.fn(() => Promise.resolve({ success: true, toolCount: 5 })),
   testRemoteServer: vi.fn(() => Promise.resolve({ success: true, toolCount: 3 })),
   testAllServers: vi.fn(() => Promise.resolve([])),

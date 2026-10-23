@@ -62,6 +62,24 @@ export class ToolFilterService {
     });
   }
 
+  setToolsEnabled(filterId: string, toolNames: string[], enabled: boolean): void {
+    this.repository.updateToolFilters((filters) => {
+      const filter = filters[filterId];
+      if (!filter) return;
+
+      const disabledTools = new Set(filter.disabledTools || []);
+      for (const toolName of toolNames) {
+        if (enabled) {
+          disabledTools.delete(toolName);
+        } else {
+          disabledTools.add(toolName);
+        }
+      }
+
+      filter.disabledTools = Array.from(disabledTools);
+    });
+  }
+
   enableAllTools(filterId: string): void {
     this.repository.updateToolFilters((filters) => {
       const filter = filters[filterId];

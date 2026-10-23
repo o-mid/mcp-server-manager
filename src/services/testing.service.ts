@@ -13,6 +13,8 @@ import type {
   ServerTestResult,
   ServerToolFilter,
   ServerAuthRequirements,
+  ToolAnnotations,
+  ToolData,
 } from "../types/index.js";
 import { getConfigService } from "./config.service.js";
 import { getAuthService } from "./auth.service.js";
@@ -36,6 +38,7 @@ interface McpToolsResponse {
       name: string;
       description?: string;
       inputSchema?: Record<string, unknown>;
+      annotations?: ToolAnnotations;
     }>;
   };
 }
@@ -102,6 +105,7 @@ export class TestingService {
       name: string;
       description?: string;
       inputSchema?: Record<string, unknown>;
+      annotations?: ToolAnnotations;
     }>,
     error?: string
   ): void {
@@ -109,7 +113,7 @@ export class TestingService {
     let filter = configService.getServerToolFilter(filterId);
 
     if (!filter) {
-      filter = { enabled: [], allTools: [], toolsData: {} };
+      filter = { allTools: [], toolsData: {} };
     }
 
     if (error) {
@@ -121,7 +125,7 @@ export class TestingService {
     }
 
     const toolNames = tools.map((t) => t.name);
-    const toolsData: Record<string, { tokens: number; description?: string }> = {};
+    const toolsData: Record<string, ToolData> = {};
     let totalTokens = 0;
 
     for (const tool of tools) {
@@ -129,6 +133,7 @@ export class TestingService {
       toolsData[tool.name] = {
         tokens,
         description: tool.description,
+        annotations: tool.annotations,
       };
       totalTokens += tokens;
     }
@@ -140,7 +145,6 @@ export class TestingService {
 
     configService.setServerToolFilter(filterId, {
       allTools: toolNames,
-      enabled: !filter.enabled || filter.enabled.length === 0 ? [...toolNames] : filter.enabled,
       disabledTools: preservedDisabledTools,
       toolsData,
       totalTokens,

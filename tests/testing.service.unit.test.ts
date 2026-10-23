@@ -225,6 +225,29 @@ describe("TestingService unit coverage", () => {
     resetTestingService();
   });
 
+  it("stores tool annotations from discovered tools", async () => {
+    const process = createProcess();
+    childProcessMocks.spawn.mockReturnValue(process);
+
+    const resultPromise = service.testLocalServer(localServer());
+    process.stdout.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({
+          result: {
+            tools: [{ name: "search", annotations: { readOnlyHint: true } }, { name: "plain" }],
+          },
+        })}\n`
+      )
+    );
+
+    await resultPromise;
+    expect(configMocks.toolFilters.local.toolsData.search.annotations).toEqual({
+      readOnlyHint: true,
+    });
+    expect(configMocks.toolFilters.local.toolsData.plain.annotations).toBeUndefined();
+  });
+
   it("tests a local server through direct spawn and records discovered tools", async () => {
     const process = createProcess();
     childProcessMocks.spawn.mockReturnValue(process);

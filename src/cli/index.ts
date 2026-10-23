@@ -34,6 +34,7 @@ function createProgram(): Command {
     .hook("preAction", (_thisCommand, actionCommand) => {
       // Store global options in command for access in handlers
       const opts = program.opts();
+      if (opts.json) actionCommand.setOptionValue("json", true);
       actionCommand.setOptionValue("globalJson", opts.json);
       actionCommand.setOptionValue("globalQuiet", opts.quiet);
       actionCommand.setOptionValue("globalVerbose", opts.verbose);

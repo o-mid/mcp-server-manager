@@ -71,6 +71,8 @@ Tools for filesystem (11/11 enabled):
   ...
 ```
 
+Tools that the server annotates are tagged `[read-only]`, `[destructive]` and `[idempotent]`. Tools without annotations get no tag. The annotations are saved by `tools discover`, so run it again for servers discovered before this feature. `--json` includes `kind` (`read-only`, `destructive` or `unclassified`) and the raw `annotations` for each tool.
+
 ---
 
 ## tools discover
@@ -106,9 +108,11 @@ mcpsm tools enable <server> [tool] [options]
 
 ### Options
 
-| Option  | Description      |
-| ------- | ---------------- |
-| `--all` | Enable all tools |
+| Option          | Description                  |
+| --------------- | ---------------------------- |
+| `--all`         | Enable all tools             |
+| `--read-only`   | Enable all read-only tools   |
+| `--destructive` | Enable all destructive tools |
 
 ### Examples
 
@@ -118,6 +122,9 @@ mcpsm tools enable filesystem write_file
 
 # Enable all tools
 mcpsm tools enable filesystem --all
+
+# Enable every read-only tool
+mcpsm tools enable filesystem --read-only
 ```
 
 ---
@@ -132,9 +139,11 @@ mcpsm tools disable <server> <tool> [options]
 
 ### Options
 
-| Option  | Description       |
-| ------- | ----------------- |
-| `--all` | Disable all tools |
+| Option          | Description                   |
+| --------------- | ----------------------------- |
+| `--all`         | Disable all tools             |
+| `--read-only`   | Disable all read-only tools   |
+| `--destructive` | Disable all destructive tools |
 
 ### Examples
 
@@ -144,6 +153,9 @@ mcpsm tools disable filesystem delete_file
 
 # Disable all tools
 mcpsm tools disable filesystem --all
+
+# Disable every destructive tool
+mcpsm tools disable filesystem --destructive
 ```
 
 ---

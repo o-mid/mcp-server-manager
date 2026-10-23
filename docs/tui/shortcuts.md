@@ -51,13 +51,13 @@ Available on all screens:
 
 ## Tool Filters Screen
 
-| Key       | Action            |
-| --------- | ----------------- |
-| `↑` / `↓` | Navigate tools    |
-| `SPACE`   | Toggle tool       |
-| `A`       | Enable all tools  |
-| `N`       | Disable all tools |
-| `ESC`     | Save and return   |
+| Key       | Action               |
+| --------- | -------------------- |
+| `↑` / `↓` | Navigate tools       |
+| `SPACE`   | Toggle tool or group |
+| `A`       | Enable all tools     |
+| `N`       | Disable all tools    |
+| `ESC`     | Save and return      |
 
 ---
 

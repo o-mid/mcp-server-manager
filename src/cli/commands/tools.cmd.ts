@@ -5,6 +5,8 @@
 import { Command } from "commander";
 import { colors, c } from "../../shared/colors.js";
 import { formatTokens, outputJson } from "../../shared/formatters.js";
+import { getToolBadges, getToolKind, getToolNamesByKind } from "../../shared/toolAnnotations.js";
+import type { ServerToolFilter } from "../../types/index.js";
 import { getConfigService } from "../../services/config.service.js";
 import { getTestingService } from "../../services/testing.service.js";
 import { getDaemonService } from "../../services/daemon.service.js";
@@ -15,6 +17,19 @@ async function refreshDaemonIfRunning(): Promise<void> {
   if (status.running) {
     await daemonService.refreshTools();
   }
+}
+
+/** Tool names for the --read-only/--destructive flags, or null when neither flag is set */
+function getGroupToolNames(
+  filter: ServerToolFilter,
+  options: { readOnly?: boolean; destructive?: boolean }
+): string[] | null {
+  if (!options.readOnly && !options.destructive) return null;
+
+  return [
+    ...(options.readOnly ? getToolNamesByKind(filter, "read-only") : []),
+    ...(options.destructive ? getToolNamesByKind(filter, "destructive") : []),
+  ];
 }
 
 /** Register tools commands */
@@ -50,14 +65,21 @@ export function registerToolsCommands(program: Command): void {
           return;
         }
 
+        const enabledSet = new Set(filter.enabled || filter.allTools);
+        const disabledSet = new Set(filter.disabledTools || []);
+        const isToolEnabled = (name: string): boolean =>
+          enabledSet.has(name) && !disabledSet.has(name);
+
         if (options.json) {
           outputJson({
             server: server.name,
             serverId: server.id,
             tools: filter.allTools.map((name) => ({
               name,
-              enabled: filter.enabled?.includes(name) ?? true,
+              enabled: isToolEnabled(name),
               tokens: filter.toolsData?.[name]?.tokens || 0,
+              kind: getToolKind(filter.toolsData?.[name]?.annotations),
+              annotations: filter.toolsData?.[name]?.annotations,
             })),
             totalTokens: filter.totalTokens || 0,
           });
@@ -66,10 +88,8 @@ export function registerToolsCommands(program: Command): void {
 
         console.log(`\n${colors.bright}${colors.cyan}Tools for ${server.name}${colors.reset}\n`);
 
-        const enabledSet = new Set(filter.enabled || filter.allTools);
-
         for (const name of filter.allTools) {
-          const isEnabled = enabledSet.has(name);
+          const isEnabled = isToolEnabled(name);
           if (!options.all && !isEnabled) continue;
 
           const status = isEnabled
@@ -78,13 +98,16 @@ export function registerToolsCommands(program: Command): void {
           const tokens = filter.toolsData?.[name]?.tokens
             ? ` ${colors.gray}(${formatTokens(filter.toolsData[name].tokens)})${colors.reset}`
             : "";
+          const badges = getToolBadges(filter.toolsData?.[name]?.annotations)
+            .map((badge) => ` ${colors.gray}[${badge}]${colors.reset}`)
+            .join("");
 
           console.log(
-            `  ${isEnabled ? "☑" : "☐"} ${colors.cyan}${name}${colors.reset} - ${status}${tokens}`
+            `  ${isEnabled ? "☑" : "☐"} ${colors.cyan}${name}${colors.reset}${badges} - ${status}${tokens}`
           );
         }
 
-        const enabledCount = filter.enabled?.length ?? filter.allTools.length;
+        const enabledCount = filter.allTools.filter(isToolEnabled).length;
         console.log(
           `\n${colors.gray}${enabledCount}/${filter.allTools.length} tools enabled${colors.reset}`
         );
@@ -212,6 +235,8 @@ export function registerToolsCommands(program: Command): void {
     .command("enable <server> [tool]")
     .description("Enable a tool or all tools for a server")
     .option("--all", "Enable all tools")
+    .option("--read-only", "Enable all read-only tools")
+    .option("--destructive", "Enable all destructive tools")
     .action(async (serverNameOrId: string, toolName: string | undefined, options) => {
       const configService = getConfigService();
       const toolFilters = configService.getToolFilters();
@@ -231,6 +256,16 @@ export function registerToolsCommands(program: Command): void {
           `${c.cross} No tools discovered for '${server.name}'. Run 'mcpsm tools discover ${serverNameOrId}' first.`
         );
         process.exit(1);
+      }
+
+      const groupToolNames = getGroupToolNames(filter, options);
+      if (groupToolNames) {
+        configService.setToolsEnabled(filterId, groupToolNames, true);
+        await refreshDaemonIfRunning();
+        console.log(
+          `${c.checkmark} Enabled ${groupToolNames.length} selected tools for '${server.name}'`
+        );
+        return;
       }
 
       if (options.all || !toolName) {
@@ -274,6 +309,8 @@ export function registerToolsCommands(program: Command): void {
     .command("disable <server> [tool]")
     .description("Disable a tool or all tools for a server")
     .option("--all", "Disable all tools")
+    .option("--read-only", "Disable all read-only tools")
+    .option("--destructive", "Disable all destructive tools")
     .action(async (serverNameOrId: string, toolName: string | undefined, options) => {
       const configService = getConfigService();
       const toolFilters = configService.getToolFilters();
@@ -293,6 +330,16 @@ export function registerToolsCommands(program: Command): void {
           `${c.cross} No tools discovered for '${server.name}'. Run 'mcpsm tools discover ${serverNameOrId}' first.`
         );
         process.exit(1);
+      }
+
+      const groupToolNames = getGroupToolNames(filter, options);
+      if (groupToolNames) {
+        configService.setToolsEnabled(filterId, groupToolNames, false);
+        await refreshDaemonIfRunning();
+        console.log(
+          `${c.checkmark} Disabled ${groupToolNames.length} selected tools for '${server.name}'`
+        );
+        return;
       }
 
       if (options.all) {

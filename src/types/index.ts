@@ -21,6 +21,7 @@ export { isLocalServer, isRemoteServer } from "./server.types.js";
 // Config types
 export type {
   AppConfig,
+  ToolAnnotations,
   ToolData,
   ServerToolFilter,
   ToolFilters,

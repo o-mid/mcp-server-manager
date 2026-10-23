@@ -143,6 +143,103 @@ describe("ToolsScreen", () => {
     });
   });
 
+  describe("Tool Annotations", () => {
+    beforeEach(() => {
+      mockConfigService.getLocalServers.mockReturnValue(sampleLocalServers);
+      mockConfigService.getToolFilters.mockReturnValue({
+        server1: {
+          allTools: ["read_a", "read_b", "delete_a", "plain"],
+          disabledTools: [],
+          toolsData: {
+            read_a: { tokens: 10, annotations: { readOnlyHint: true, idempotentHint: true } },
+            read_b: { tokens: 10, annotations: { readOnlyHint: true } },
+            delete_a: { tokens: 10, annotations: { destructiveHint: true } },
+            plain: { tokens: 10 },
+          },
+        },
+      });
+    });
+
+    it("should show badges next to annotated tools", () => {
+      const { lastFrame } = render(<ToolsScreen onBack={mockOnBack} initialServerId="server1" />);
+
+      const frame = lastFrame() ?? "";
+      expect(frame).toContain("[read-only]");
+      expect(frame).toContain("[destructive]");
+      expect(frame).toContain("[idempotent]");
+    });
+
+    it("should show group rows with counts above the tools", () => {
+      const { lastFrame } = render(<ToolsScreen onBack={mockOnBack} initialServerId="server1" />);
+
+      const frame = lastFrame() ?? "";
+      expect(frame).toContain("All read-only (2)");
+      expect(frame).toContain("All destructive (1)");
+    });
+
+    it("should not show group rows when no tool has annotations", () => {
+      mockConfigService.getToolFilters.mockReturnValue({
+        server1: { allTools: ["plain"], disabledTools: [], toolsData: { plain: { tokens: 10 } } },
+      });
+
+      const { lastFrame } = render(<ToolsScreen onBack={mockOnBack} initialServerId="server1" />);
+
+      expect(lastFrame()).not.toContain("All read-only");
+      expect(lastFrame()).not.toContain("All destructive");
+    });
+
+    it("should disable the whole group with Space when all of it is enabled", async () => {
+      const { stdin } = render(<ToolsScreen onBack={mockOnBack} initialServerId="server1" />);
+
+      stdin.write(KEYS.SPACE);
+      await waitForStateUpdate();
+
+      expect(mockConfigService.setToolsEnabled).toHaveBeenCalledWith(
+        "server1",
+        ["read_a", "read_b"],
+        false
+      );
+      expect(mockConfigService.toggleTool).not.toHaveBeenCalled();
+    });
+
+    it("should enable the whole group with Space when part of it is disabled", async () => {
+      mockConfigService.getToolFilters.mockReturnValue({
+        server1: {
+          allTools: ["read_a", "read_b"],
+          disabledTools: ["read_b"],
+          toolsData: {
+            read_a: { tokens: 10, annotations: { readOnlyHint: true } },
+            read_b: { tokens: 10, annotations: { readOnlyHint: true } },
+          },
+        },
+      });
+
+      const { stdin } = render(<ToolsScreen onBack={mockOnBack} initialServerId="server1" />);
+
+      stdin.write(KEYS.SPACE);
+      await waitForStateUpdate();
+
+      expect(mockConfigService.setToolsEnabled).toHaveBeenCalledWith(
+        "server1",
+        ["read_a", "read_b"],
+        true
+      );
+    });
+
+    it("should toggle a single tool when Space is pressed on a tool row", async () => {
+      const { stdin } = render(<ToolsScreen onBack={mockOnBack} initialServerId="server1" />);
+
+      stdin.write(KEYS.DOWN);
+      await waitForStateUpdate();
+      stdin.write(KEYS.DOWN);
+      await waitForStateUpdate();
+      stdin.write(KEYS.SPACE);
+      await waitForStateUpdate();
+
+      expect(mockConfigService.toggleTool).toHaveBeenCalledWith("server1", "read_a");
+    });
+  });
+
   describe("Help Text", () => {
     it("should display keyboard shortcuts", () => {
       const { lastFrame } = render(<ToolsScreen onBack={mockOnBack} />);

@@ -34,6 +34,7 @@ export const mockConfigService = {
   updateLocalServer: vi.fn(() => ({ success: true })),
   updateRemoteServer: vi.fn(() => ({ success: true })),
   toggleTool: vi.fn(),
+  setToolsEnabled: vi.fn(),
   enableAllTools: vi.fn(),
   disableAllTools: vi.fn(),
   resetToolFilters: vi.fn(() => ({ success: true })),

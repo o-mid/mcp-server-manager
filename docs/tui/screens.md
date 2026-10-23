@@ -222,13 +222,15 @@ Tools for deepwiki:
 - Global token dashboard across all servers
 - Enable/disable individual tools
 - Bulk enable/disable
+- Badges for read-only, destructive and idempotent tools (from the server's annotations)
+- "All read-only" and "All destructive" rows at the top of the list: move up to them and press `SPACE` to check or uncheck every tool in the group
 
 ### Actions
 
 | Key       | Action                   |
 | --------- | ------------------------ |
 | `↑` / `↓` | Navigate tools           |
-| `SPACE`   | Toggle current tool      |
+| `SPACE`   | Toggle tool or group     |
 | `A`       | Enable all tools         |
 | `N`       | Disable all tools        |
 | `X`       | Discover/retest tools    |

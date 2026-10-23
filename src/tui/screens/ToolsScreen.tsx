@@ -11,6 +11,8 @@ import { getDaemonService } from "../../services/daemon.service.js";
 import { getTestingService } from "../../services/testing.service.js";
 import type { ServerToolFilter } from "../../types/index.js";
 import { formatTokens } from "../../shared/formatters.js";
+import { getToolBadges, getToolNamesByKind } from "../../shared/toolAnnotations.js";
+import type { ToolKind } from "../../shared/toolAnnotations.js";
 import { getEnabledTokenTotal } from "../utils/tokenTotals.js";
 import { useTheme } from "../theme/index.js";
 
@@ -30,6 +32,25 @@ interface ToolsState {
   isTesting: boolean;
   view: "server" | "global";
   globalIndex: number;
+}
+
+type ToolRow =
+  | { type: "group"; kind: Exclude<ToolKind, "unclassified">; names: string[] }
+  | { type: "tool"; name: string };
+
+const GROUP_KINDS = ["read-only", "destructive"] as const;
+
+function buildRows(filter: ServerToolFilter | null): ToolRow[] {
+  if (!filter) return [];
+
+  const groups = GROUP_KINDS.map((kind) => ({
+    type: "group" as const,
+    kind,
+    names: getToolNamesByKind(filter, kind),
+  })).filter((group) => group.names.length > 0);
+  const tools = (filter.allTools || []).map((name) => ({ type: "tool" as const, name }));
+
+  return [...groups, ...tools];
 }
 
 export function ToolsScreen({ onBack, initialServerId }: ToolsScreenProps): React.ReactElement {
@@ -188,6 +209,7 @@ export function ToolsScreen({ onBack, initialServerId }: ToolsScreenProps): Reac
   useInput((input, key) => {
     const { serverId, tools, currentToolIndex, view } = state;
     const { items: globalItems } = buildGlobalTotals();
+    const rows = buildRows(state.filter);
 
     // Quit / Back
     if (input === "q" || key.escape) {
@@ -249,27 +271,33 @@ export function ToolsScreen({ onBack, initialServerId }: ToolsScreenProps): Reac
     }
 
     // Server view navigation
-    if (key.upArrow && tools.length > 0) {
+    if (key.upArrow && rows.length > 0) {
       setState((prev) => ({
         ...prev,
-        currentToolIndex: (currentToolIndex - 1 + tools.length) % tools.length,
+        currentToolIndex: (currentToolIndex - 1 + rows.length) % rows.length,
       }));
       return;
     }
 
     // Navigation - Down
-    if (key.downArrow && tools.length > 0) {
+    if (key.downArrow && rows.length > 0) {
       setState((prev) => ({
         ...prev,
-        currentToolIndex: (currentToolIndex + 1) % tools.length,
+        currentToolIndex: (currentToolIndex + 1) % rows.length,
       }));
       return;
     }
 
-    // Toggle tool - Space
-    if (input === " " && tools.length > 0 && serverId) {
-      const tool = tools[currentToolIndex];
-      configService.toggleTool(serverId, tool);
+    // Toggle tool or whole group - Space
+    if (input === " " && rows.length > 0 && serverId) {
+      const row = rows[currentToolIndex];
+      if (row.type === "group") {
+        const disabled = new Set(state.filter?.disabledTools || []);
+        const allEnabled = row.names.every((name) => !disabled.has(name));
+        configService.setToolsEnabled(serverId, row.names, !allEnabled);
+      } else {
+        configService.toggleTool(serverId, row.name);
+      }
       refreshDaemonIfRunning();
       reloadTools(true);
       return;
@@ -380,7 +408,7 @@ export function ToolsScreen({ onBack, initialServerId }: ToolsScreenProps): Reac
 
   const toolsMenuSections = createMenuSections({
     actions: [
-      { key: "Space", label: "Toggle" },
+      { key: "Space", label: "Toggle tool or group" },
       { key: "A", label: "Enable all" },
       { key: "N", label: "Disable all" },
       { key: "X", label: "Discover tools" },
@@ -432,14 +460,34 @@ export function ToolsScreen({ onBack, initialServerId }: ToolsScreenProps): Reac
         </Box>
       ) : (
         <ScrollableList
-          items={tools}
+          items={buildRows(filter)}
           selectedIndex={currentToolIndex}
           emptyMessage="No tools discovered for this server."
-          renderItem={(tool, idx) => {
+          renderItem={(row, idx) => {
             const isCurrent = idx === currentToolIndex;
+
+            if (row.type === "group") {
+              const allEnabled = row.names.every((name) => !disabledTools.has(name));
+              return (
+                <Box key={`group:${row.kind}`} gap={1} paddingX={1}>
+                  <Text color={isCurrent ? theme.colors.highlightText : theme.colors.primary}>
+                    {isCurrent ? "→" : " "}
+                  </Text>
+                  <Text color={allEnabled ? theme.colors.success : theme.colors.error}>
+                    {allEnabled ? "[✓]" : "[ ]"}
+                  </Text>
+                  <Text color={isCurrent ? "magenta" : undefined} bold>
+                    All {row.kind} ({row.names.length})
+                  </Text>
+                </Box>
+              );
+            }
+
+            const tool = row.name;
             const isEnabled = !disabledTools.has(tool);
             const tokens = filter?.toolsData?.[tool]?.tokens;
             const tokenLabel = typeof tokens === "number" ? `${formatTokens(tokens)} tokens` : null;
+            const badges = getToolBadges(filter?.toolsData?.[tool]?.annotations);
 
             return (
               <Box key={tool} gap={1} paddingX={1}>
@@ -455,6 +503,21 @@ export function ToolsScreen({ onBack, initialServerId }: ToolsScreenProps): Reac
                 >
                   {tool}
                 </Text>
+                {badges.map((badge) => (
+                  <Text
+                    key={badge}
+                    color={
+                      badge === "read-only"
+                        ? theme.colors.success
+                        : badge === "destructive"
+                          ? theme.colors.error
+                          : undefined
+                    }
+                    dimColor={badge === "idempotent"}
+                  >
+                    [{badge}]
+                  </Text>
+                ))}
                 {tokenLabel && (
                   <>
                     <Text dimColor>·</Text>

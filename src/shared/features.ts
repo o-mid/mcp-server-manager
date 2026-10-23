@@ -112,6 +112,14 @@ export const FEATURES: Feature[] = [
     tuiImplementation: "ToolsScreen.tsx",
     requiredInTui: true,
   },
+  {
+    id: "tools-group-toggle",
+    name: "Enable/disable read-only or destructive tools",
+    category: "tools",
+    cliCommands: ["tools enable --read-only", "tools disable --destructive"],
+    tuiImplementation: "ToolsScreen.tsx",
+    requiredInTui: true,
+  },
 
   // === Clients ===
   {

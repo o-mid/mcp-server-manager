@@ -94,6 +94,26 @@ describe("ToolFilterService", () => {
     expect(service.getEnabledTools("server")).toEqual(["fetch"]);
   });
 
+  it("enables or disables a set of tools in one call", () => {
+    const { service } = createService({
+      server: { allTools: ["search", "fetch", "list"], disabledTools: ["fetch"] },
+    });
+
+    service.setToolsEnabled("server", ["search", "list"], false);
+    expect(service.getDisabledTools("server")).toEqual(["fetch", "search", "list"]);
+
+    service.setToolsEnabled("server", ["fetch", "list"], true);
+    expect(service.getDisabledTools("server")).toEqual(["search"]);
+  });
+
+  it("ignores set enabled requests for missing filters", () => {
+    const { service, repository } = createService();
+
+    service.setToolsEnabled("missing", ["search"], false);
+
+    expect(repository.getToolFilters()).toEqual({});
+  });
+
   it("enables or disables every known tool for a server", () => {
     const { service } = createService({
       server: { allTools: ["search", "fetch", "list"], disabledTools: ["fetch"] },

@@ -14,10 +14,18 @@ export interface AppConfig {
   port: number;
 }
 
+/** Behavior hints sent by MCP servers (all optional, self-reported) */
+export interface ToolAnnotations {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+}
+
 /** Tool data with token information */
 export interface ToolData {
   tokens: number;
   description?: string;
+  annotations?: ToolAnnotations;
 }
 
 /** Tool filter for a single server */

@@ -66,9 +66,12 @@ Available on all screens:
 | Key     | Action                                       |
 | ------- | -------------------------------------------- |
 | `↑/↓`   | Navigate between clients                     |
-| `ENTER` | Toggle connect/disconnect for current client |
+| `SPACE` | Toggle connect/disconnect for current client |
+| `S`     | Switch global/current folder                 |
 | `R`     | Refresh detected clients                     |
 | `ESC`   | Return to main menu                          |
+
+Status, connect/disconnect, and config actions use the selected scope.
 
 ---
 

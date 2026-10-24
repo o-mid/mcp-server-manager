@@ -28,6 +28,7 @@ export class CodexStrategy extends TomlClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "codex",
     project: ".codex/config.toml",
     primary: {
       darwin: path.join(this.getHomedir(), ".codex/config.toml"),
@@ -55,31 +56,17 @@ export class CodexStrategy extends TomlClientStrategy {
       | Record<string, Record<string, unknown>>
       | undefined;
 
-    if (mcpServersToml) {
-      for (const [name, server] of Object.entries(mcpServersToml)) {
-        if (server.command || server.url || this.projectDir) {
-          const serverConfig: ClientServerConfig = {};
-
-          if (server.command) {
-            serverConfig.command = server.command as string;
-            serverConfig.args = (server.args as string[]) || [];
-          }
-
-          if (server.url) {
-            serverConfig.url = server.url as string;
-          }
-
-          if (server.type) {
-            serverConfig.type = server.type as string;
-          }
-
-          if (server.env) {
-            serverConfig.env = server.env as Record<string, string>;
-          }
-
-          mcpServers[name] = serverConfig;
-        }
+    if (!mcpServersToml) return { mcpServers };
+    for (const [name, server] of Object.entries(mcpServersToml)) {
+      const serverConfig: ClientServerConfig = {};
+      if (server.command) {
+        serverConfig.command = server.command as string;
+        serverConfig.args = (server.args as string[]) || [];
       }
+      if (server.url) serverConfig.url = server.url as string;
+      if (server.type) serverConfig.type = server.type as string;
+      if (server.env) serverConfig.env = server.env as Record<string, string>;
+      mcpServers[name] = serverConfig;
     }
 
     return { mcpServers };
@@ -95,7 +82,6 @@ export class CodexStrategy extends TomlClientStrategy {
       for (const [name, server] of Object.entries(config.mcpServers)) {
         const existingServers = existingConfig.mcp_servers;
         const existingServer =
-          this.projectDir &&
           existingServers &&
           typeof existingServers === "object" &&
           !Array.isArray(existingServers) &&
@@ -106,11 +92,14 @@ export class CodexStrategy extends TomlClientStrategy {
           existingServer &&
           typeof existingServer === "object" &&
           !Array.isArray(existingServer) &&
-          !(existingServer instanceof Date) &&
-          existingServer.command === server.command &&
-          existingServer.url === server.url
+          !(existingServer instanceof Date)
             ? { ...existingServer }
             : {};
+        delete serverConfig.command;
+        delete serverConfig.args;
+        delete serverConfig.url;
+        delete serverConfig.type;
+        delete serverConfig.env;
 
         if (server.command) {
           serverConfig.command = server.command;

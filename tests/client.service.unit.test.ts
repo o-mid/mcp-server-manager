@@ -16,6 +16,9 @@ const clientMocks = vi.hoisted(() => {
     getSecondaryConfigPath: vi.fn(() => "/tmp/mock-client-secondary.json"),
     isInstalled: vi.fn(() => true),
     readConfig: vi.fn(() => ({ mcpServers: {} })),
+    readConfigForUpdate: vi.fn(() => ({ mcpServers: {} })),
+    getGatewayKeys: vi.fn(() => []),
+    removeGateway: vi.fn((config) => config),
     writeConfig: vi.fn(() => true),
     getStatus: vi.fn(() => "connected"),
     getServerCount: vi.fn(() => 3),
@@ -194,18 +197,15 @@ describe("ClientService facade", () => {
     });
   });
 
-  it("disconnects the bare gateway and every profile", () => {
-    mockStrategy().disconnect = vi.fn((profileId?: string) =>
-      profileId === "prod" ? { success: false } : { success: true }
-    );
-
+  it("disconnects all stored gateway keys, including deleted profiles", () => {
+    clientMocks.strategy.getGatewayKeys.mockReturnValue(["mcpsm", "mcpsm-dev", "mcpsm-deleted"]);
     expect(service.disconnectAllProfiles("mock" as ClientId)).toEqual({
-      succeeded: ["dev"],
-      failed: [{ id: "prod", error: "Unknown error" }],
+      succeeded: ["*", "dev", "deleted"],
+      failed: [],
     });
-    expect(mockStrategy().disconnect).toHaveBeenCalledWith();
-    expect(mockStrategy().disconnect).toHaveBeenCalledWith("dev");
-    expect(mockStrategy().disconnect).toHaveBeenCalledWith("prod");
+    expect(mockStrategy().removeGateway).toHaveBeenCalledWith(expect.anything(), undefined);
+    expect(mockStrategy().removeGateway).toHaveBeenCalledWith(expect.anything(), "deleted");
+    expect(mockStrategy().writeConfig).toHaveBeenCalled();
     expect(service.disconnectAllProfiles("missing" as ClientId)).toEqual({
       succeeded: [],
       failed: [{ id: "*", error: "Unknown client" }],

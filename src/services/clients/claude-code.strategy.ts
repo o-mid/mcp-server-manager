@@ -26,6 +26,7 @@ export class ClaudeCodeStrategy extends JsonClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "claude",
     project: ".mcp.json",
     primary: {
       darwin: path.join(this.getHomedir(), ".claude.json"),

@@ -5,6 +5,7 @@
 import { Command } from "commander";
 import { colors, c } from "../../shared/colors.js";
 import { outputJson } from "../../shared/formatters.js";
+import { changeGatewayPort } from "../../services/gateway-port.service.js";
 import { getSettingsService } from "../../services/settings.service.js";
 import type { Settings } from "../../types/index.js";
 
@@ -97,10 +98,17 @@ export function registerSettingsCommands(program: Command): void {
         process.exit(1);
       }
 
-      const result = settingsService.set(key as keyof Settings, value);
+      const result =
+        key === "port"
+          ? { ...(await changeGatewayPort(Number(value))), value: Number(value) }
+          : settingsService.set(key as keyof Settings, value);
 
       if (result.success) {
         console.log(`${c.checkmark} ${key} = ${result.value}`);
+        if ("warnings" in result && Array.isArray(result.warnings)) {
+          for (const warning of result.warnings || [])
+            console.log(`${colors.yellow}${warning}${colors.reset}`);
+        }
       } else {
         console.log(`${c.cross} ${result.error}`);
         process.exit(1);
@@ -122,7 +130,21 @@ export function registerSettingsCommands(program: Command): void {
       }
 
       const settingsService = getSettingsService();
-      settingsService.reset();
-      console.log(`${c.checkmark} Settings reset to defaults`);
+      const result = await changeGatewayPort(Number(settingsService.getInfo().port.default));
+      if (!result.success) {
+        console.log(`${c.cross} ${result.error}`);
+        process.exit(1);
+      }
+      try {
+        settingsService.reset();
+        console.log(`${c.checkmark} Settings reset to defaults`);
+      } catch (error) {
+        result.warnings.push(
+          `Port saved, but settings could not be reset: ${error instanceof Error ? error.message : String(error)}`
+        );
+        console.log(`${c.checkmark} Port reset to defaults`);
+      }
+      for (const warning of result.warnings)
+        console.log(`${colors.yellow}${warning}${colors.reset}`);
     });
 }

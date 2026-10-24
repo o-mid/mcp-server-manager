@@ -26,6 +26,7 @@ export class KiroStrategy extends JsonClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "kiro",
     project: ".kiro/settings/mcp.json",
     primary: {
       darwin: path.join(this.getHomedir(), ".kiro/settings/mcp.json"),

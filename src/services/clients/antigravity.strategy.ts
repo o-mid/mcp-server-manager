@@ -27,6 +27,7 @@ export class AntigravityStrategy extends JsonClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "antigravity",
     project: ".agents/mcp_config.json",
     primary: {
       darwin: path.join(this.getHomedir(), ".antigravity/mcp_config.json"),

@@ -70,7 +70,7 @@ export abstract class BaseClientStrategy implements IClientStrategy {
     if (this.capabilities.hasSecondaryConfigPath && this.paths.secondary) {
       return this.paths.secondary;
     }
-    return this.paths.primary[platform] || null;
+    return this.getPrimaryConfigPath(platform);
   }
 
   // === Installation Detection ===
@@ -81,6 +81,8 @@ export abstract class BaseClientStrategy implements IClientStrategy {
 
     const projectPath = this.projectDir ? this.getPrimaryConfigPath(platform) : null;
     if (projectPath && fs.existsSync(projectPath)) return true;
+
+    if (this.paths.secondary && fs.existsSync(this.paths.secondary)) return true;
 
     // Check if config file exists
     if (fs.existsSync(configPath)) return true;
@@ -98,6 +100,25 @@ export abstract class BaseClientStrategy implements IClientStrategy {
     const binaryPath = this.paths.binaryPaths?.[platform];
     if (binaryPath && fs.existsSync(binaryPath)) return true;
 
+    const executable = this.paths.executable;
+    if (!executable) return false;
+    const extensions =
+      platform === "win32" ? (process.env.PATHEXT || ".EXE;.CMD;.BAT;.COM").split(";") : [""];
+    const directories = (process.env.PATH || "").split(platform === "win32" ? ";" : ":");
+    for (const directory of directories) {
+      if (!directory) continue;
+      for (const extension of extensions) {
+        const binary = path.join(
+          directory.replace(/^"|"$/g, ""),
+          executable + extension.toLowerCase()
+        );
+        try {
+          if (!fs.statSync(binary).isFile()) continue;
+          fs.accessSync(binary, platform === "win32" ? fs.constants.F_OK : fs.constants.X_OK);
+          return true;
+        } catch {}
+      }
+    }
     return false;
   }
 
@@ -105,6 +126,26 @@ export abstract class BaseClientStrategy implements IClientStrategy {
 
   abstract readConfig(): ClientMcpConfig | null;
   abstract writeConfig(config: ClientMcpConfig): boolean;
+
+  readConfigForUpdate() {
+    const config = this.readConfig();
+    if (config) return config;
+    const configPath = this.getEffectiveConfigPath(this.getPlatform());
+    if (!configPath) throw new Error("Client does not support this configuration scope");
+    try {
+      fs.statSync(configPath);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
+      throw error;
+    }
+    throw new Error(`Could not read config ${configPath}; file was not changed`);
+  }
+
+  getGatewayKeys(config: ClientMcpConfig) {
+    return Object.keys(this.getServersFromConfig(config) || {}).filter(
+      (key) => key === "mcpsm" || (key.startsWith("mcpsm-") && key.length > 6)
+    );
+  }
 
   // === Server Container Access (Abstract - each strategy is self-aware) ===
 
@@ -153,7 +194,12 @@ export abstract class BaseClientStrategy implements IClientStrategy {
     const servers = this.getServersFromConfig(config) || {};
     const gatewayConfig = this.buildGatewayConfig(port, profileId);
     const key = this.getGatewayKey(profileId);
-    return this.setServersInConfig(config, { ...servers, [key]: gatewayConfig });
+    const options = { ...servers[key] };
+    delete options.command;
+    delete options.args;
+    delete options.type;
+    delete options.url;
+    return this.setServersInConfig(config, { ...servers, [key]: { ...options, ...gatewayConfig } });
   }
 
   removeGateway(config: ClientMcpConfig, profileId?: string): ClientMcpConfig {
@@ -179,11 +225,7 @@ export abstract class BaseClientStrategy implements IClientStrategy {
     }
 
     try {
-      const existingConfig = this.readConfig();
-      const configPath = this.getEffectiveConfigPath(platform);
-      if (this.projectDir && configPath && fs.existsSync(configPath) && !existingConfig) {
-        return { success: false, error: "Could not read project config; file was not changed" };
-      }
+      const existingConfig = this.readConfigForUpdate();
       let config = existingConfig || {};
       config = this.addGateway(config, port, profileId);
 
@@ -203,11 +245,7 @@ export abstract class BaseClientStrategy implements IClientStrategy {
       return { success: false, error: "Client does not support project configuration" };
     }
     try {
-      const config = this.readConfig();
-      const configPath = this.getEffectiveConfigPath(this.getPlatform());
-      if (this.projectDir && configPath && fs.existsSync(configPath) && !config) {
-        return { success: false, error: "Could not read project config; file was not changed" };
-      }
+      const config = this.readConfigForUpdate();
 
       if (!config || !this.hasGateway(config, profileId)) {
         return { success: true }; // Already disconnected

@@ -33,7 +33,7 @@ mcpsm clients open cursor --scope project
 mcpsm clients disconnect cursor --scope project
 ```
 
-Project files are created relative to the directory where you run mcpsm. Run from the folder opened by your client, usually the project root. Global configs are not changed, and existing project settings and other servers are preserved. JSON comments and formatting are not retained when saving.
+Project files are created relative to the directory where you run mcpsm. Run from the folder opened by your client, usually the project root. Project connections do not change global configs, and existing project settings and other servers are preserved. Existing configs that cannot be parsed are left untouched and return an error; this includes commented global JSON files that the global parser does not support. JSON comments and formatting are not retained when saving.
 
 | Client | Project config |
 | --- | --- |
@@ -49,7 +49,7 @@ Project files are created relative to the directory where you run mcpsm. Run fro
 
 Claude Desktop and Windsurf remain global only and are excluded from the project list. Clients may require approval or project trust before loading local MCP configuration. Codex requires a trusted project; Claude Code asks to approve project MCP servers.
 
-The scope controls the client gateway entry. MCPSM profiles, servers, and daemon settings still use the existing manager configuration. If the daemon port changes, reconnect each project's clients to update their local entries.
+The scope controls the client gateway entry. MCPSM profiles, servers, and daemon settings still use the existing manager configuration. Successful project connections are registered in the manager's private `clients.json` file. Port changes update existing gateways in global configs and registered projects, including profile gateways. Files that are missing, unreadable, or not writable are skipped with a warning; other updates still proceed. Fix the reported path and reconnect, or repeat the port command to retry. Previously created project configs need one reconnect to register. MCPSM does not scan for projects.
 
 ---
 
@@ -218,7 +218,7 @@ mcpsm port 9000
 
 **Automatic Updates:**
 
-- All connected clients are automatically reconnected
+- Existing global gateways and registered project gateways are updated without recreating removed entries
 - The new port is written to each client's configuration
 - No manual editing required
 - Real-time loading clients (Cursor, Windsurf, VS Code, Zed) see changes without restart

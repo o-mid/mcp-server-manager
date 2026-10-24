@@ -26,6 +26,7 @@ export class WindsurfStrategy extends JsonClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "windsurf",
     primary: {
       darwin: path.join(
         this.getHomedir(),

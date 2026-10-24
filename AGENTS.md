@@ -115,6 +115,7 @@ All business logic is encapsulated in singleton services:
 - `tool-filters.json` - Per-server tool enable/disable settings
 - `settings.json` - App settings (includes port configuration)
 - `profiles.json` - Profile definitions
+- `clients.json` - Registered project/client locations for port updates
 
 ### Client Configuration Files
 
@@ -192,7 +193,7 @@ mcpsm edit <server>                Edit server
 mcpsm test [server]                Test server(s)
 mcpsm import [file]                Import servers from file or client
 mcpsm export                        Export server configuration
-mcpsm clients [list|connect|disconnect|open]
+mcpsm clients [list|connect|disconnect|open] [--scope global|project]
 mcpsm profile [list|create|clone|delete|rename|use|add|remove]
 mcpsm settings [list|get|set|reset]
 mcpsm tools [list|discover|enable|disable]
@@ -337,6 +338,6 @@ When conflicts are detected between imported and existing servers:
 
 ### Important Notes on Port Changes
 
-- When port is changed in Settings (G), all connected clients are **automatically updated**
-- The system reconnects each client to ensure the new port is used
+- Port edits and settings reset share `changeGatewayPort`; existing global and registered project gateways are updated. Failed paths produce warnings and remain registered for retry.
+- Clients screen: `S` switches global/current folder; Space toggles the selected profile. Status and config actions use that scope.
 - No client restart required for real-time loading clients (Cursor, Windsurf, VS Code)

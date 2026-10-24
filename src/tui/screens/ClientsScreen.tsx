@@ -76,16 +76,24 @@ export function ClientsScreen({ onBack, currentProfileId, currentProfileName, on
     setState((prev) => ({ ...prev, connecting: true }));
 
     let message: string;
-    let messageType: "success" | "error";
+    let messageType: "success" | "error" | "info";
 
     if (client.status === "connected") {
       const result = clientService.disconnectClient(client.id, currentProfileId);
       message = result.success ? "Disconnected" : result.error || "Failed to disconnect";
       messageType = result.success ? "success" : "error";
+      if (result.warnings?.length) {
+        message += `: ${result.warnings.join("; ")}`;
+        messageType = "info";
+      }
     } else {
       const result = clientService.connectClient(client.id, currentProfileId);
       message = result.success ? "Connected" : result.error || "Failed to connect";
       messageType = result.success ? "success" : "error";
+      if (result.warnings?.length) {
+        message += `: ${result.warnings.join("; ")}`;
+        messageType = "info";
+      }
     }
 
     setState((prev) => ({

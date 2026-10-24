@@ -15,6 +15,7 @@ import type {
   OperationResult,
 } from "../types/index.js";
 import { getConfigService } from "./config.service.js";
+import { ProjectConnectionsService } from "./project-connections.service.js";
 import { getProfileService } from "./profile.service.js";
 import { getClientStrategy, getRegisteredClientIds, clearStrategyCache } from "./clients/index.js";
 
@@ -31,6 +32,30 @@ export class ClientService {
   supportsProjectConfig(clientId: ClientId) {
     return !!this.getStrategy(clientId)?.paths.project;
   }
+  private updateProjectRegistration(clientId: ClientId, result: OperationResult) {
+    if (!this.projectDir || !result.success) return result;
+    try {
+      const strategy = this.getStrategy(clientId);
+      const config = strategy?.readConfigForUpdate();
+      const registry = new ProjectConnectionsService();
+      if (strategy && config && strategy.getGatewayKeys(config).length > 0) {
+        registry.register(this.projectDir, clientId);
+      } else {
+        registry.unregister(this.projectDir, clientId);
+      }
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        ...result,
+        warnings: [
+          ...(result.warnings || []),
+          `${message}. Reconnect ${clientId} in ${this.projectDir} to retry project tracking.`,
+        ],
+      };
+    }
+  }
+
   /** Get current platform */
   private getPlatform(): Platform {
     return process.platform as Platform;
@@ -109,7 +134,7 @@ export class ClientService {
     const configService = getConfigService();
     const port = configService.getPort();
 
-    return strategy.connect(port, profileId);
+    return this.updateProjectRegistration(clientId, strategy.connect(port, profileId));
   }
 
   /** Disconnect servers from a specific client (remove our servers from client config) */
@@ -119,13 +144,14 @@ export class ClientService {
       return { success: false, error: "Unknown client" };
     }
 
-    return strategy.disconnect(profileId);
+    return this.updateProjectRegistration(clientId, strategy.disconnect(profileId));
   }
 
   /** Connect all profiles to a client (one gateway entry per profile) */
   connectAllProfiles(clientId: ClientId): {
     succeeded: string[];
     failed: { id: string; error: string }[];
+    warnings?: string[];
   } {
     const strategy = this.getStrategy(clientId);
     if (!strategy) {
@@ -139,9 +165,11 @@ export class ClientService {
 
     const succeeded: string[] = [];
     const failed: { id: string; error: string }[] = [];
+    const warnings: string[] = [];
 
     for (const profile of profiles) {
       const result = strategy.connect(port, profile.id);
+      warnings.push(...(result.warnings || []));
       if (result.success) {
         succeeded.push(profile.id);
       } else {
@@ -149,38 +177,62 @@ export class ClientService {
       }
     }
 
-    return { succeeded, failed };
+    if (succeeded.length > 0) {
+      const registration = this.updateProjectRegistration(clientId, { success: true });
+      warnings.push(...(registration.warnings || []));
+    }
+    return { succeeded, failed, ...(warnings.length > 0 ? { warnings } : {}) };
   }
 
   /** Disconnect all profiles from a client */
   disconnectAllProfiles(clientId: ClientId): {
     succeeded: string[];
     failed: { id: string; error: string }[];
+    warnings?: string[];
   } {
     const strategy = this.getStrategy(clientId);
     if (!strategy) {
       return { succeeded: [], failed: [{ id: "*", error: "Unknown client" }] };
     }
 
-    const profileService = getProfileService();
-    const profiles = profileService.list();
-
     const succeeded: string[] = [];
     const failed: { id: string; error: string }[] = [];
-
-    // Also disconnect the bare "mcpsm" entry (no profile)
-    strategy.disconnect();
-
-    for (const profile of profiles) {
-      const result = strategy.disconnect(profile.id);
-      if (result.success) {
-        succeeded.push(profile.id);
-      } else {
-        failed.push({ id: profile.id, error: result.error || "Unknown error" });
+    try {
+      let config = strategy.readConfigForUpdate();
+      if (!config) {
+        const registration = this.updateProjectRegistration(clientId, { success: true });
+        return {
+          succeeded,
+          failed,
+          ...(registration.warnings ? { warnings: registration.warnings } : {}),
+        };
       }
+      const keys = strategy.getGatewayKeys(config);
+      for (const key of keys) {
+        config = strategy.removeGateway(config, key === "mcpsm" ? undefined : key.slice(6));
+      }
+      if (keys.length > 0 && !strategy.writeConfig(config)) {
+        return {
+          succeeded,
+          failed: keys.map((key) => ({
+            id: key === "mcpsm" ? "*" : key.slice(6),
+            error: "Failed to write config",
+          })),
+        };
+      }
+      succeeded.push(...keys.map((key) => (key === "mcpsm" ? "*" : key.slice(6))));
+      const registration = this.updateProjectRegistration(clientId, { success: true });
+      return {
+        succeeded,
+        failed,
+        ...(registration.warnings ? { warnings: registration.warnings } : {}),
+      };
+    } catch (error) {
+      return {
+        succeeded,
+        failed: [{ id: "*", error: error instanceof Error ? error.message : String(error) }],
+      };
     }
-
-    return { succeeded, failed };
   }
 
   /** Get connection status for a client */

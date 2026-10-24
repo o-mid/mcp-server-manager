@@ -79,7 +79,7 @@ mcpsm settings reset
 
 ### port
 
-Gateway HTTP port number.
+Gateway HTTP port number. Port edits and settings reset update existing global and registered project gateways and refresh the running daemon. A failed client config produces a warning while the saved port change proceeds; repair the reported path and repeat the port command to retry.
 
 ```bash
 mcpsm settings set port 8080

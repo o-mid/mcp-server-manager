@@ -31,6 +31,7 @@ export class OpenCodeStrategy extends JsonClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "opencode",
     project: "opencode.json",
     // Primary path is the XDG standard location: $HOME/.config/opencode/config.json
     primary: {
@@ -44,9 +45,8 @@ export class OpenCodeStrategy extends JsonClientStrategy {
     },
   };
 
-  getPrimaryConfigPath(platform: Platform) {
-    if (this.projectDir) return this.getWriteConfigPath();
-    return super.getPrimaryConfigPath(platform);
+  getPrimaryConfigPath(_platform: Platform) {
+    return this.getWriteConfigPath();
   }
 
   // === Server Container Access (uses 'mcp' not 'mcpServers') ===
@@ -122,19 +122,15 @@ export class OpenCodeStrategy extends JsonClientStrategy {
    * Override isInstalled to check all possible config locations
    */
   isInstalled(platform: Platform): boolean {
-    // Check if any config file exists
     if (this.findExistingConfigPath()) return true;
+    if (fs.existsSync(path.join(this.getHomedir(), ".opencode.json"))) return true;
 
     // Check if the opencode config directory exists (indicates opencode is installed)
     const xdgConfigHome = process.env.XDG_CONFIG_HOME || path.join(this.getHomedir(), ".config");
     const opencodeConfigDir = path.join(xdgConfigHome, "opencode");
     if (fs.existsSync(opencodeConfigDir)) return true;
 
-    // Check binary paths
-    const binaryPath = this.paths.binaryPaths?.[platform];
-    if (binaryPath && fs.existsSync(binaryPath)) return true;
-
-    return false;
+    return super.isInstalled(platform);
   }
 
   /**
@@ -149,7 +145,10 @@ export class OpenCodeStrategy extends JsonClientStrategy {
 
     try {
       const data = fs.readFileSync(configPath, "utf8");
-      return this.projectDir ? parseJsonWithComments(data) : (JSON.parse(data) as ClientMcpConfig);
+      if (this.projectDir) return parseJsonWithComments(data);
+      const config: unknown = JSON.parse(data);
+      if (!config || typeof config !== "object" || Array.isArray(config)) return null;
+      return { ...config };
     } catch (error) {
       this.log.debug(`Failed to read config from ${configPath}:`, error);
       return null;

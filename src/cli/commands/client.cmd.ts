@@ -90,11 +90,6 @@ export function registerClientCommands(program: Command): void {
         process.exit(1);
       }
 
-      if (!clientService.isClientInstalled(clientId as ClientId)) {
-        console.log(`${c.cross} ${clientName} is not installed`);
-        process.exit(1);
-      }
-
       if (!options.scope && process.stdin.isTTY && clientService.supportsProjectConfig(clientId)) {
         const scope = await promptSelect<ClientScope>("Where should the client be configured?", [
           { label: "Global", value: "global" },
@@ -108,6 +103,11 @@ export function registerClientCommands(program: Command): void {
         process.exit(1);
       }
 
+      if (!clientService.isClientInstalled(clientId as ClientId)) {
+        console.log(`${c.cross} ${clientName} is not installed`);
+        process.exit(1);
+      }
+
       if (options.profile) {
         const profileService = getProfileService();
         if (!profileService.exists(options.profile)) {
@@ -118,6 +118,8 @@ export function registerClientCommands(program: Command): void {
         console.log(`Connecting profile '${options.profile}' to ${clientName}...`);
         const result = clientService.connectClient(clientId as ClientId, options.profile);
 
+        for (const warning of result.warnings || [])
+          console.log(`${colors.yellow}${warning}${colors.reset}`);
         if (result.success) {
           console.log(`${c.checkmark} Connected profile '${options.profile}' to ${clientName}`);
         } else {
@@ -128,7 +130,11 @@ export function registerClientCommands(program: Command): void {
       }
 
       console.log(`Connecting all profiles to ${clientName}...`);
-      const { succeeded, failed } = clientService.connectAllProfiles(clientId as ClientId);
+      const { succeeded, failed, warnings } = clientService.connectAllProfiles(
+        clientId as ClientId
+      );
+      for (const warning of warnings || [])
+        console.log(`${colors.yellow}${warning}${colors.reset}`);
 
       for (const id of succeeded) {
         console.log(`  ${c.checkmark} ${id}`);
@@ -176,6 +182,8 @@ export function registerClientCommands(program: Command): void {
         console.log(`Disconnecting profile '${options.profile}' from ${clientName}...`);
         const result = clientService.disconnectClient(clientId as ClientId, options.profile);
 
+        for (const warning of result.warnings || [])
+          console.log(`${colors.yellow}${warning}${colors.reset}`);
         if (result.success) {
           console.log(
             `${c.checkmark} Disconnected profile '${options.profile}' from ${clientName}`
@@ -188,7 +196,9 @@ export function registerClientCommands(program: Command): void {
       }
 
       console.log(`Disconnecting all profiles from ${clientName}...`);
-      const { failed } = clientService.disconnectAllProfiles(clientId as ClientId);
+      const { failed, warnings } = clientService.disconnectAllProfiles(clientId as ClientId);
+      for (const warning of warnings || [])
+        console.log(`${colors.yellow}${warning}${colors.reset}`);
 
       if (failed.length > 0) {
         for (const f of failed) {

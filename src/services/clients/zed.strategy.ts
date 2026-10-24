@@ -43,6 +43,7 @@ export class ZedStrategy extends BaseClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "zed",
     project: ".zed/settings.json",
     primary: {
       darwin: path.join(this.getHomedir(), ".config/zed/settings.json"),
@@ -55,14 +56,11 @@ export class ZedStrategy extends BaseClientStrategy {
   };
 
   // === Server Container Access (Zed uses context_servers, not standard MCP keys) ===
-  // These are implemented for abstract contract but gateway methods are fully overridden
 
   protected getServersFromConfig(
-    _config: ClientMcpConfig
+    config: ClientMcpConfig
   ): Record<string, ClientServerConfig> | undefined {
-    // Zed uses context_servers, not mcpServers/servers
-    // Gateway methods are fully overridden to use context_servers
-    return undefined;
+    return (config as ZedConfig).context_servers;
   }
 
   protected setServersInConfig(
@@ -138,9 +136,10 @@ export class ZedStrategy extends BaseClientStrategy {
     const contextServers = zedConfig.context_servers ?? {};
     const gatewayId = getGatewayId(profileId);
     const gatewayConfig: ZedContextServer = {
-      ...(this.buildGatewayConfig(port, profileId) as ZedContextServer),
-      headers: {},
-      settings: {},
+      ...contextServers[gatewayId],
+      ...this.buildGatewayConfig(port, profileId),
+      headers: contextServers[gatewayId]?.headers || {},
+      settings: contextServers[gatewayId]?.settings || {},
     };
 
     return {

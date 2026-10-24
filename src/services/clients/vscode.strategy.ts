@@ -28,6 +28,7 @@ export class VSCodeStrategy extends JsonClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "code",
     project: ".vscode/mcp.json",
     primary: {
       darwin: path.join(this.getHomedir(), "Library/Application Support/Code/User/mcp.json"),

@@ -159,7 +159,7 @@ The gateway runs on port 8850 by default. To change it:
 mcpsm port 9000
 ```
 
-All connected clients are **automatically updated** with the new port. No manual config editing needed!
+Existing global and registered project gateways are updated with the new port. Missing or inaccessible configs produce warnings; fix the reported path and repeat the port command to retry.
 
 ## Configuration Details
 
@@ -327,18 +327,17 @@ mcpsm port 9000
 
 The system:
 
-1. Detects all connected clients
-2. Removes the mcpsm gateway from each
-3. Updates the port in settings
-4. Adds the mcpsm gateway back with the new port
-5. Writes to both primary and real-time config paths
+1. Saves the port in daemon config and settings
+2. Updates existing global gateways and registered project gateways
+3. Refreshes the running daemon on the new port
+4. Reports warnings for config files that could not be updated
 
-**All connected clients are automatically updated without any manual intervention.**
+**The port change proceeds even when some config files cannot be updated.** Their registrations are retained for retry. Reconnect older project configs once to register them; MCPSM does not scan project folders.
 
 Example output:
 
 ```
-✓ Updated port for 3 clients (Claude Desktop, Cursor, Windsurf)
+✓ Port set to 9000
 ```
 
 ## Daemon Relationship

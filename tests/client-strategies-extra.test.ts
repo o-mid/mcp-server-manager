@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -20,9 +20,13 @@ describe("additional client strategies", () => {
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mcpsm-strategy-extra-"));
+    vi.spyOn(os, "homedir").mockReturnValue(path.join(tempDir, "user"));
+    vi.stubEnv("PATH", "");
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     fs.rmSync(tempDir, { recursive: true, force: true });
     if (originalXdgConfigHome === undefined) {
       delete process.env.XDG_CONFIG_HOME;
@@ -64,6 +68,7 @@ foo = "bar"
       mcpServers: {
         local: { command: "node", args: ["server.js"] },
         remote: { url: "https://api.test/mcp", type: "http" },
+        noop: {},
       },
     });
 

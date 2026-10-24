@@ -126,6 +126,24 @@ export class DaemonService {
     }
   }
 
+  getPortUpdateStatus() {
+    try {
+      const pid = Number(fs.readFileSync(this.pidFile, "utf8"));
+      if (Number.isInteger(pid) && pid > 0) {
+        const command = execSync(`ps -p ${pid} -o args=`, {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"],
+        });
+        if (
+          /(?:bin\/cli\.js|dist\/cli\/index\.js)\s+daemon start --foreground(?:\s|$)/.test(command)
+        ) {
+          return { running: true, pid };
+        }
+      }
+    } catch {}
+    return this.isDaemonRunning();
+  }
+
   /** Check if daemon is running */
   isDaemonRunning(): DaemonStatus {
     const configService = getConfigService();
@@ -402,8 +420,8 @@ export class DaemonService {
   }
 
   /** Ask the running daemon to refresh its configuration without restarting */
-  async refreshDaemon(): Promise<Result> {
-    const status = this.isDaemonRunning();
+  async refreshDaemon(target?: DaemonStatus, requireHealthy = false): Promise<Result> {
+    const status = target ?? this.isDaemonRunning();
     if (!status.running || !status.pid) {
       return { success: false, error: "Daemon is not running" };
     }
@@ -425,17 +443,25 @@ export class DaemonService {
     try {
       const configService = getConfigService();
       const port = configService.getPort();
-      await ofetch(`http://localhost:${port}/health`, {
+      const health = await ofetch<{ status?: string }>(`http://localhost:${port}/health`, {
         timeout: REFRESH_HEALTH_CHECK_TIMEOUT_MS,
         retry: REFRESH_HEALTH_CHECK_RETRY_COUNT,
         retryDelay: REFRESH_HEALTH_CHECK_RETRY_DELAY_MS,
       });
+      if (requireHealthy && health.status !== "ok") {
+        return { success: false, error: "Daemon responded without confirming readiness" };
+      }
       return { success: true };
     } catch (error) {
       // Signal was sent successfully, but health check failed
       // This is expected if daemon is slow to respond - still consider success
       const message = error instanceof Error ? error.message : String(error);
       log.debug(`Refresh signal sent but health check inconclusive: ${message}`);
+      if (requireHealthy)
+        return {
+          success: false,
+          error: "Refresh signaled, but daemon readiness was not confirmed",
+        };
       return { success: true };
     }
   }

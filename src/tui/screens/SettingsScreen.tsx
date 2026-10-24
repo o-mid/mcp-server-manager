@@ -2,16 +2,16 @@
  * SettingsScreen - Manage application settings (ink component)
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { spawnSync } from "child_process";
 import { ScreenLayout } from "../components/index.js";
 import { createMenuSections } from "../utils/menu.js";
 import { getSettingsService } from "../../services/settings.service.js";
-import { getClientService } from "../../services/client.service.js";
+import { updateGatewayPort } from "../../services/port.service.js";
 import { getConfigService } from "../../services/config.service.js";
-import type { Settings, ClientId } from "../../types/index.js";
+import type { Settings } from "../../types/index.js";
 import { useTheme } from "../theme/index.js";
 
 type View = "list" | "edit" | "confirmReset";
@@ -35,6 +35,12 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
   const { theme } = useTheme();
   const settingsService = getSettingsService();
   const configService = getConfigService();
+  const mounted = useRef(true);
+  const messageTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => {
+    mounted.current = false;
+    clearTimeout(messageTimer.current);
+  }, []);
 
   const allKeys = settingsService.getKeys();
   const initialIndex = initialKey ? Math.max(0, allKeys.indexOf(initialKey)) : 0;
@@ -52,8 +58,10 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
   // Show temporary message
   const showMessage = useCallback(
     (msg: string, type: "success" | "error" | "info" = "info") => {
+      if (!mounted.current) return;
+      clearTimeout(messageTimer.current);
       setState((prev) => ({ ...prev, message: msg, messageType: type }));
-      setTimeout(() => {
+      messageTimer.current = setTimeout(() => {
         setState((prev) => ({ ...prev, message: null }));
       }, 2000);
     },
@@ -62,7 +70,7 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
 
   // Handle edit setting
   const handleEditSetting = useCallback(
-    (value: string) => {
+    async (value: string) => {
       const key = state.keys[state.currentIndex];
       if (!key) {
         setState((prev) => ({ ...prev, view: "list", editValue: "" }));
@@ -70,34 +78,18 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
       }
 
       if (value.trim()) {
-        const result = settingsService.set(key, value.trim());
-        if (result.success) {
-          showMessage(`Setting '${key}' updated`, "success");
-
-          // If port was changed, update all connected clients
-          if (key === "port") {
-            const clientService = getClientService();
-            const detectedClients = clientService.detectClients();
-            const connectedClients = detectedClients.filter((c) => c.status === "connected");
-
-            // Reconnect all clients to update the port in their configs
-            for (const client of connectedClients) {
-              clientService.disconnectClient(client.id as ClientId);
-              clientService.connectClient(client.id as ClientId);
-            }
-
-            if (connectedClients.length > 0) {
-              showMessage(
-                `Updated port for ${connectedClients.length} client${connectedClients.length === 1 ? "" : "s"}`,
-                "success"
-              );
-            }
-          }
-        } else {
-          showMessage(result.error || "Failed to update setting", "error");
+        try {
+          const result = key === "port"
+            ? await updateGatewayPort(Number(value))
+            : settingsService.set(key, value.trim());
+          showMessage(result.success ? "Setting updated" : result.error || "Failed to update setting",
+            result.success ? "success" : "error");
+        } catch (error) {
+          showMessage(error instanceof Error ? error.message : String(error), "error");
         }
       }
 
+      if (!mounted.current) return;
       setState((prev) => ({
         ...prev,
         settings: settingsService.getAll(),
@@ -110,10 +102,17 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
 
   // Handle reset all
   const handleResetAll = useCallback(
-    (confirm: boolean) => {
+    async (confirm: boolean) => {
       if (confirm) {
-        settingsService.reset();
-        showMessage("Settings reset to defaults", "success");
+        try {
+          const result = await updateGatewayPort(Number(settingsService.getInfo().port.default));
+          settingsService.reset();
+          showMessage(result.success ? "Settings reset to defaults" : result.error || "Port update incomplete",
+            result.success ? "success" : "error");
+        } catch (error) {
+          showMessage(error instanceof Error ? error.message : String(error), "error");
+        }
+        if (!mounted.current) return;
         setState((prev) => ({
           ...prev,
           settings: settingsService.getAll(),

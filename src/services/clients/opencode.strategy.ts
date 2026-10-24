@@ -95,6 +95,10 @@ export class OpenCodeStrategy extends JsonClientStrategy {
    * Get the path to use for writing config
    * Uses existing path if found, otherwise uses XDG standard path
    */
+  getEffectiveConfigPath(_platform: Platform): string {
+    return this.getWriteConfigPath();
+  }
+
   private getWriteConfigPath(): string {
     const existingPath = this.findExistingConfigPath();
     if (existingPath) {

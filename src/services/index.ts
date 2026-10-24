@@ -76,3 +76,8 @@ export type {
   AuthServerMetadata,
   ServerAuthRequirements,
 } from "../types/index.js";
+
+export { runDoctorChecks } from "./doctor.service.js";
+export { updateGatewayPort, type PortUpdateResult } from "./port.service.js";
+
+export { refreshDaemonIfRunning } from "./daemon-refresh.js";

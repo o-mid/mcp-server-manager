@@ -110,6 +110,18 @@ export class ClientService {
     return strategy.disconnect(profileId);
   }
 
+  updateConnectedGatewayPorts(port: number) {
+    const failures: Array<{ clientId: ClientId; error: string }> = [];
+    for (const clientId of this.getSupportedClients()) {
+      const strategy = getClientStrategy(clientId);
+      if (!strategy) continue;
+      const result = strategy.updateGatewayPort(port);
+      if (!result.success)
+        failures.push({ clientId, error: result.error || "Failed to update client" });
+    }
+    return failures;
+  }
+
   /** Connect all profiles to a client (one gateway entry per profile) */
   connectAllProfiles(clientId: ClientId): {
     succeeded: string[];

@@ -140,6 +140,8 @@ export interface IClientStrategy {
   /**
    * Connect the client to MCPSM
    */
+  updateGatewayPort(port: number): OperationResult;
+
   connect(port: number, profileId?: string): OperationResult;
 
   /**

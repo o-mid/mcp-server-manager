@@ -1,3 +1,4 @@
+import { parse, type ParseError } from "jsonc-parser";
 /**
  * Zed Strategy - Strategy for Zed editor
  * Uses settings.json with context_servers entries
@@ -27,128 +28,16 @@ function getGatewayId(profileId?: string): string {
   return profileId ? `mcpsm-${profileId}` : "mcpsm";
 }
 
-function stripJsonComments(input: string): string {
-  let result = "";
-  let inString = false;
-  let escaped = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-
-  for (let i = 0; i < input.length; i += 1) {
-    const char = input[i];
-    const next = input[i + 1];
-
-    if (inLineComment) {
-      if (char === "\n") {
-        inLineComment = false;
-        result += char;
-      }
-      continue;
-    }
-
-    if (inBlockComment) {
-      if (char === "*" && next === "/") {
-        inBlockComment = false;
-        i += 1;
-      }
-      continue;
-    }
-
-    if (inString) {
-      result += char;
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      result += char;
-      continue;
-    }
-
-    if (char === "/" && next === "/") {
-      inLineComment = true;
-      i += 1;
-      continue;
-    }
-
-    if (char === "/" && next === "*") {
-      inBlockComment = true;
-      i += 1;
-      continue;
-    }
-
-    result += char;
-  }
-
-  return result;
-}
-
-function stripTrailingCommas(input: string): string {
-  let result = "";
-  let inString = false;
-  let escaped = false;
-
-  for (let i = 0; i < input.length; i += 1) {
-    const char = input[i];
-
-    if (inString) {
-      result += char;
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      result += char;
-      continue;
-    }
-
-    if (char === ",") {
-      let j = i + 1;
-      while (j < input.length) {
-        const next = input[j];
-        if (next === " " || next === "\t" || next === "\n" || next === "\r") {
-          j += 1;
-          continue;
-        }
-        if (next === "}" || next === "]") {
-          break;
-        }
-        j = -1;
-        break;
-      }
-
-      if (j > 0 && j < input.length && (input[j] === "}" || input[j] === "]")) {
-        continue;
-      }
-    }
-
-    result += char;
-  }
-
-  return result;
-}
-
 function parseJsonWithComments(input: string): ZedConfig | null {
-  try {
-    const sanitized = stripTrailingCommas(stripJsonComments(input));
-    return JSON.parse(sanitized) as ZedConfig;
-  } catch {
+  const errors: ParseError[] = [];
+  const parsed: unknown = parse(input, errors, {
+    allowTrailingComma: true,
+    disallowComments: false,
+  });
+  if (errors.length || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     return null;
   }
+  return parsed as ZedConfig;
 }
 
 export class ZedStrategy extends BaseClientStrategy {
@@ -176,24 +65,28 @@ export class ZedStrategy extends BaseClientStrategy {
     },
   };
 
-  // === Server Container Access (Zed uses context_servers, not standard MCP keys) ===
-  // These are implemented for abstract contract but gateway methods are fully overridden
-
   protected getServersFromConfig(
-    _config: ClientMcpConfig
+    config: ClientMcpConfig
   ): Record<string, ClientServerConfig> | undefined {
-    // Zed uses context_servers, not mcpServers/servers
-    // Gateway methods are fully overridden to use context_servers
-    return undefined;
+    return (config as ZedConfig).context_servers;
   }
 
   protected setServersInConfig(
     config: ClientMcpConfig,
-    _servers: Record<string, ClientServerConfig>
+    servers: Record<string, ClientServerConfig>
   ): ClientMcpConfig {
-    // Zed uses context_servers, not mcpServers/servers
-    // Gateway methods are fully overridden to use context_servers
-    return config;
+    return { ...config, context_servers: servers };
+  }
+
+  connect(port: number, profileId?: string): { success: boolean; error?: string } {
+    const configPath = this.getEffectiveConfigPath(this.getPlatform());
+    if (configPath && fs.existsSync(configPath) && !this.readConfig()) {
+      return {
+        success: false,
+        error: "Cannot connect: invalid or unreadable config at " + configPath,
+      };
+    }
+    return super.connect(port, profileId);
   }
 
   readConfig(): ClientMcpConfig | null {
@@ -210,7 +103,7 @@ export class ZedStrategy extends BaseClientStrategy {
       if (!parsed || typeof parsed !== "object") {
         return null;
       }
-      return parsed;
+      return parsed as ZedConfig;
     } catch (error) {
       this.log.debug(`Failed to read config from ${configPath}:`, error);
       return null;

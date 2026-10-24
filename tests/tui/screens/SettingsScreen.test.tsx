@@ -5,6 +5,7 @@
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { spawnSync } from "child_process";
+import { updateGatewayPort } from "../../../src/services/port.service.js";
 import { render } from "../setup.js";
 import {
   mockClientService,
@@ -16,6 +17,10 @@ import {
 } from "../setup.js";
 
 // Setup mocks before importing component
+vi.mock("../../../src/services/port.service.js", () => ({
+  updateGatewayPort: vi.fn(async () => ({ success: true, port: 8850, clientErrors: [] })),
+}));
+
 vi.mock("../../../src/services/settings.service.js", () => ({
   getSettingsService: vi.fn(() => mockSettingsService),
 }));
@@ -219,11 +224,9 @@ describe("SettingsScreen", () => {
       stdin.write(KEYS.ENTER);
       await waitForStateUpdate();
 
-      expect(mockSettingsService.set).toHaveBeenCalledWith("port", "8850");
-      expect(mockClientService.detectClients).toHaveBeenCalled();
-      expect(mockClientService.disconnectClient).toHaveBeenCalledWith("claude");
-      expect(mockClientService.connectClient).toHaveBeenCalledWith("claude");
-      expect(mockClientService.disconnectClient).not.toHaveBeenCalledWith("cursor");
+      expect(updateGatewayPort).toHaveBeenCalledWith(8850);
+      expect(mockClientService.disconnectClient).not.toHaveBeenCalled();
+      expect(lastFrame()).toContain("Setting updated");
     });
 
     it("should show an error message when saving a setting fails", async () => {

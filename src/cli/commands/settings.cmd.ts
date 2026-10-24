@@ -1,3 +1,4 @@
+import { updateGatewayPort } from "../../services/port.service.js";
 /**
  * Settings commands - list, get, set, reset
  */
@@ -97,6 +98,17 @@ export function registerSettingsCommands(program: Command): void {
         process.exit(1);
       }
 
+      if (key === "port") {
+        const result = await updateGatewayPort(Number(value));
+        if (!result.success) {
+          console.error("Port is " + result.port + ": " + result.error);
+          process.exitCode = 1;
+          return;
+        }
+        console.log("port = " + result.port);
+        return;
+      }
+
       const result = settingsService.set(key as keyof Settings, value);
 
       if (result.success) {
@@ -122,7 +134,13 @@ export function registerSettingsCommands(program: Command): void {
       }
 
       const settingsService = getSettingsService();
+      const result = await updateGatewayPort(Number(settingsService.getInfo().port.default));
       settingsService.reset();
+      if (!result.success) {
+        console.error("Port is " + result.port + ": " + result.error);
+        process.exitCode = 1;
+        return;
+      }
       console.log(`${c.checkmark} Settings reset to defaults`);
     });
 }

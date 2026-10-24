@@ -119,12 +119,12 @@ describe("SettingsScreen", () => {
       expect(mockOnBack).toHaveBeenCalled();
     });
 
-    it("should call onBack when ESC is pressed", () => {
+    it("should call onBack when ESC is pressed", async () => {
       const { stdin } = render(<SettingsScreen onBack={mockOnBack} />);
 
       stdin.write(KEYS.ESCAPE);
 
-      expect(mockOnBack).toHaveBeenCalled();
+      await vi.waitFor(() => expect(mockOnBack).toHaveBeenCalled());
     });
 
     it("should navigate between settings with arrow keys", async () => {
@@ -232,8 +232,7 @@ describe("SettingsScreen", () => {
       stdin.write(KEYS.ENTER);
       await waitForStateUpdate();
       stdin.write(KEYS.ENTER);
-      await waitForStateUpdate();
-      expect(lastFrame()).toContain("project config is read-only");
+      await vi.waitFor(() => expect(lastFrame()).toContain("project config is read-only"));
     });
 
     it("should show an error message when saving a setting fails", async () => {

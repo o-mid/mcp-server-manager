@@ -3,10 +3,12 @@
  */
 
 import React from "react";
-import { vi } from "vitest";
-import { render as inkRender } from "ink-testing-library";
+import { afterEach, vi } from "vitest";
+import { cleanup, render as inkRender } from "ink-testing-library";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "../../src/tui/theme/ThemeContext.js";
+
+afterEach(cleanup);
 
 // Create a fresh QueryClient for each test
 const createTestQueryClient = (): QueryClient =>
@@ -215,62 +217,59 @@ export const mockImportExportService = {
   export: vi.fn(() => ({ servers: [], remoteServers: [] })),
 };
 
-// Setup all mocks
-export function setupMocks(): void {
-  vi.mock("../../src/services/config.service.js", () => ({
-    getConfigService: vi.fn(() => mockConfigService),
-    ConfigService: vi.fn(() => mockConfigService),
-    resetConfigService: vi.fn(),
-  }));
+vi.mock("../../src/services/config.service.js", () => ({
+  getConfigService: vi.fn(() => mockConfigService),
+  ConfigService: vi.fn(() => mockConfigService),
+  resetConfigService: vi.fn(),
+}));
 
-  vi.mock("../../src/services/testing.service.js", () => ({
-    getTestingService: vi.fn(() => mockTestingService),
-    TestingService: vi.fn(() => mockTestingService),
-    resetTestingService: vi.fn(),
-  }));
+vi.mock("../../src/services/testing.service.js", () => ({
+  getTestingService: vi.fn(() => mockTestingService),
+  TestingService: vi.fn(() => mockTestingService),
+  resetTestingService: vi.fn(),
+}));
 
-  vi.mock("../../src/services/client.service.js", () => ({
-    getClientService: vi.fn(() => mockClientService),
-    ClientService: vi.fn(() => mockClientService),
-    resetClientService: vi.fn(),
-  }));
+vi.mock("../../src/services/client.service.js", () => ({
+  getClientService: vi.fn(() => mockClientService),
+  ClientService: vi.fn(() => mockClientService),
+  resetClientService: vi.fn(),
+}));
 
-  vi.mock("../../src/services/profile.service.js", () => ({
-    getProfileService: vi.fn(() => mockProfileService),
-    ProfileService: vi.fn(() => mockProfileService),
-    resetProfileService: vi.fn(),
-  }));
+vi.mock("../../src/services/profile.service.js", () => ({
+  getProfileService: vi.fn(() => mockProfileService),
+  ProfileService: vi.fn(() => mockProfileService),
+  resetProfileService: vi.fn(),
+}));
 
-  vi.mock("../../src/services/settings.service.js", () => ({
-    getSettingsService: vi.fn(() => mockSettingsService),
-    SettingsService: vi.fn(() => mockSettingsService),
-    resetSettingsService: vi.fn(),
-  }));
+vi.mock("../../src/services/settings.service.js", () => ({
+  getSettingsService: vi.fn(() => mockSettingsService),
+  SettingsService: vi.fn(() => mockSettingsService),
+  resetSettingsService: vi.fn(),
+}));
 
-  vi.mock("../../src/services/daemon.service.js", () => ({
-    getDaemonService: vi.fn(() => mockDaemonService),
-    DaemonService: vi.fn(() => mockDaemonService),
-    resetDaemonService: vi.fn(),
-  }));
+vi.mock("../../src/services/daemon.service.js", () => ({
+  getDaemonService: vi.fn(() => mockDaemonService),
+  DaemonService: vi.fn(() => mockDaemonService),
+  resetDaemonService: vi.fn(),
+}));
 
-  vi.mock("../../src/services/auth.service.js", () => ({
-    getAuthService: vi.fn(() => mockAuthService),
-    AuthService: vi.fn(() => mockAuthService),
-    resetAuthService: vi.fn(),
-  }));
+vi.mock("../../src/services/auth.service.js", () => ({
+  getAuthService: vi.fn(() => mockAuthService),
+  AuthService: vi.fn(() => mockAuthService),
+  resetAuthService: vi.fn(),
+}));
 
-  vi.mock("../../src/services/import-export.service.js", () => ({
-    getImportExportService: vi.fn(() => mockImportExportService),
-    ImportExportService: vi.fn(() => mockImportExportService),
-    resetImportExportService: vi.fn(),
-  }));
+vi.mock("../../src/services/import-export.service.js", () => ({
+  getImportExportService: vi.fn(() => mockImportExportService),
+  ImportExportService: vi.fn(() => mockImportExportService),
+  resetImportExportService: vi.fn(),
+}));
 
-  vi.mock("../../src/shared/formatters.js", () => ({
-    formatTokens: vi.fn((n: number) => n.toLocaleString()),
-    formatSwitchable: vi.fn((label: string) => `◀ ${label} ▶`),
-    outputJson: vi.fn(),
-  }));
-}
+vi.mock("../../src/shared/formatters.js", () => ({
+  formatTokens: vi.fn((n: number) => n.toLocaleString()),
+  formatSwitchable: vi.fn((label: string) => `◀ ${label} ▶`),
+  outputJson: vi.fn(),
+}));
 
 // Sample test data
 export const sampleLocalServers = [

@@ -2,7 +2,6 @@ import React from "react";
 import { describe, it, beforeEach, expect, vi } from "vitest";
 import { render } from "../setup.js";
 import {
-  setupMocks,
   mockConfigService,
   mockAuthService,
   mockTestingService,
@@ -11,13 +10,10 @@ import {
   KEYS,
 } from "../../tui/setup.js";
 
-setupMocks();
-
 import { AuthScreen } from "../../../src/tui/screens/AuthScreen.js";
 
 describe("AuthScreen", () => {
   beforeEach(() => {
-    setupMocks();
     vi.clearAllMocks();
     mockConfigService.getRemoteServers.mockReturnValue(
       sampleRemoteServers.map((s) => ({ ...s, oauth: { enabled: true } }))
@@ -94,9 +90,9 @@ describe("AuthScreen", () => {
   it("goes back on ESC", async () => {
     const onBack = vi.fn();
     const { stdin } = render(<AuthScreen onBack={onBack} />);
-    await waitForStateUpdate();
+    await vi.waitFor(() => expect(stdin.listenerCount("readable")).toBeGreaterThan(0));
     stdin.write(KEYS.ESCAPE);
-    expect(onBack).toHaveBeenCalled();
+    await vi.waitFor(() => expect(onBack).toHaveBeenCalled());
   });
 
   it("allows login when an expired token has a refresh token but refresh fails", async () => {

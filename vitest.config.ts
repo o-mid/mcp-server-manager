@@ -25,12 +25,7 @@ export default defineConfig({
     },
     // Prevent orphan processes and improve cleanup
     pool: "forks",
-    poolOptions: {
-      forks: {
-        singleFork: false,
-        maxForks: 3, // Limit concurrent forks to prevent resource exhaustion
-      },
-    },
+    maxWorkers: 3,
     // Ensure tests don't hang
     testTimeout: 30000,
     hookTimeout: 10000,

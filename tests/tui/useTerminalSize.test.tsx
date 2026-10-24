@@ -1,11 +1,11 @@
 import React from "react";
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { EventEmitter } from "node:events";
-import { render } from "./setup.js";
+import { cleanup, render } from "ink-testing-library";
 
 const mockStdout = new (class extends EventEmitter {
-  columns = 80;
-  rows = 24;
+  columns: number | undefined = 80;
+  rows: number | undefined = 24;
   isTTY = true;
   write() {
     return true;
@@ -29,18 +29,33 @@ function TestComponent(): React.ReactElement {
 }
 
 describe("useTerminalSize", () => {
+  beforeEach(() => {
+    mockStdout.columns = 80;
+    mockStdout.rows = 24;
+  });
+
+  afterEach(cleanup);
+
   it("updates when stdout emits resize", async () => {
-    const { lastFrame } = render(<TestComponent />, {
-      exitOnCtrlC: false,
-    });
+    const { lastFrame, unmount } = render(<TestComponent />);
+    await vi.waitFor(() => expect(lastFrame()).toContain("80x24"));
 
     mockStdout.columns = 120;
     mockStdout.rows = 40;
     mockStdout.emit("resize");
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(lastFrame()).toContain("120x40");
+    await vi.waitFor(() => expect(lastFrame()).toContain("120x40"));
+    unmount();
+    await vi.waitFor(() => expect(mockStdout.listenerCount("resize")).toBe(0));
   });
+
+  it.each([undefined, 0])(
+    "uses fallback dimensions when stream dimensions are %s",
+    async (size) => {
+      mockStdout.columns = size;
+      mockStdout.rows = size;
+      const { lastFrame } = render(<TestComponent />);
+      await vi.waitFor(() => expect(lastFrame()).toContain("60x20"));
+    }
+  );
 });
-
-

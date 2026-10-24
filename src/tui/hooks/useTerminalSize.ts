@@ -9,21 +9,24 @@ interface TerminalSize {
   rows: number;
 }
 
+function getTerminalSize(stdout: ReturnType<typeof useStdout>["stdout"]) {
+  const columns = "columns" in stdout ? stdout.columns : undefined;
+  const rows = "rows" in stdout ? stdout.rows : undefined;
+  return {
+    columns: typeof columns === "number" ? columns || 60 : 60,
+    rows: typeof rows === "number" ? rows || 20 : 20,
+  };
+}
+
 export function useTerminalSize(): TerminalSize {
   const { stdout } = useStdout();
-  const [size, setSize] = useState<TerminalSize>({
-    columns: stdout?.columns || 60,
-    rows: stdout?.rows || 20,
-  });
+  const [size, setSize] = useState(() => getTerminalSize(stdout));
 
   useEffect(() => {
     if (!stdout) return;
 
     const updateSize = (): void => {
-      setSize({
-        columns: stdout.columns || 60,
-        rows: stdout.rows || 20,
-      });
+      setSize(getTerminalSize(stdout));
     };
 
     stdout.on("resize", updateSize);

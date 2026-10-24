@@ -52,10 +52,7 @@ export interface FilterOptions {
 
 /** Common list options */
 export interface ListOptions
-  extends JsonOutputOptions,
-    PaginationOptions,
-    SortOptions,
-    FilterOptions {}
+  extends JsonOutputOptions, PaginationOptions, SortOptions, FilterOptions {}
 
 /** Key-value pair */
 export interface KeyValue<T = string> {

@@ -53,8 +53,7 @@ export class CodexStrategy extends TomlClientStrategy {
     const mcpServers: Record<string, ClientServerConfig> = {};
 
     const mcpServersToml = tomlConfig.mcp_servers as
-      | Record<string, Record<string, unknown>>
-      | undefined;
+      Record<string, Record<string, unknown>> | undefined;
 
     if (!mcpServersToml) return { mcpServers };
     for (const [name, server] of Object.entries(mcpServersToml)) {

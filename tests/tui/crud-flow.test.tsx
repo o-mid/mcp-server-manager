@@ -13,15 +13,12 @@ import {
   mockSettingsService,
   mockDaemonService,
   mockImportExportService,
-  setupMocks,
   KEYS,
   waitForStateUpdate,
 } from "./setup.js";
 import sardineConfig from "../fixtures/sardine-config.json";
 import { REDACTED_PLACEHOLDER } from "../../src/shared/redaction.js";
 import type { LocalServer, RemoteServer } from "../../src/types/index.js";
-
-setupMocks();
 
 vi.mock("../../src/services/config.service.js", () => ({
   getConfigService: vi.fn(() => mockConfigService),

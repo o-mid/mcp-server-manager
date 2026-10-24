@@ -103,12 +103,12 @@ describe("AddServerScreen", () => {
   });
 
   describe("Navigation", () => {
-    it("should call onBack when ESC is pressed on first step", () => {
+    it("should call onBack when ESC is pressed on first step", async () => {
       const { stdin } = render(<AddServerScreen onBack={mockOnBack} />);
 
       stdin.write(KEYS.ESCAPE);
 
-      expect(mockOnBack).toHaveBeenCalled();
+      await vi.waitFor(() => expect(mockOnBack).toHaveBeenCalled());
     });
 
     it("should not call onBack when ESC is pressed on later steps", async () => {

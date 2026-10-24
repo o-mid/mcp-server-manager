@@ -119,12 +119,12 @@ describe("SettingsScreen", () => {
       expect(mockOnBack).toHaveBeenCalled();
     });
 
-    it("should call onBack when ESC is pressed", () => {
+    it("should call onBack when ESC is pressed", async () => {
       const { stdin } = render(<SettingsScreen onBack={mockOnBack} />);
 
       stdin.write(KEYS.ESCAPE);
 
-      expect(mockOnBack).toHaveBeenCalled();
+      await vi.waitFor(() => expect(mockOnBack).toHaveBeenCalled());
     });
 
     it("should navigate between settings with arrow keys", async () => {

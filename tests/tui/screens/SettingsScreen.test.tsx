@@ -15,6 +15,9 @@ import {
   KEYS,
 } from "../setup.js";
 
+const changeGatewayPort = vi.hoisted(() => vi.fn(async (_port: number) => { const warnings: string[] = []; return { success: true, warnings }; }));
+vi.mock("../../../src/services/gateway-port.service.js", () => ({ changeGatewayPort }));
+
 // Setup mocks before importing component
 vi.mock("../../../src/services/settings.service.js", () => ({
   getSettingsService: vi.fn(() => mockSettingsService),
@@ -219,11 +222,18 @@ describe("SettingsScreen", () => {
       stdin.write(KEYS.ENTER);
       await waitForStateUpdate();
 
-      expect(mockSettingsService.set).toHaveBeenCalledWith("port", "8850");
-      expect(mockClientService.detectClients).toHaveBeenCalled();
-      expect(mockClientService.disconnectClient).toHaveBeenCalledWith("claude");
-      expect(mockClientService.connectClient).toHaveBeenCalledWith("claude");
-      expect(mockClientService.disconnectClient).not.toHaveBeenCalledWith("cursor");
+      expect(changeGatewayPort).toHaveBeenCalledWith(8850);
+      expect(mockClientService.disconnectClient).not.toHaveBeenCalled();
+    });
+
+    it("keeps partial port-update warnings visible", async () => {
+      changeGatewayPort.mockResolvedValueOnce({ success: true, warnings: ["project config is read-only"] });
+      const { stdin, lastFrame } = render(<SettingsScreen onBack={mockOnBack} initialKey="port" />);
+      stdin.write(KEYS.ENTER);
+      await waitForStateUpdate();
+      stdin.write(KEYS.ENTER);
+      await waitForStateUpdate();
+      expect(lastFrame()).toContain("project config is read-only");
     });
 
     it("should show an error message when saving a setting fails", async () => {

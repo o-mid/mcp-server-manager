@@ -43,6 +43,8 @@ export interface ClientCapabilities {
 export interface ClientPlatformPaths {
   /** Primary config path per platform */
   primary: Partial<Record<Platform, string>>;
+  project?: string;
+  executable?: string;
   /** Secondary (real-time) config path, if applicable */
   secondary?: string | null;
   /** App bundle paths for installation detection (macOS) */
@@ -107,6 +109,10 @@ export interface IClientStrategy {
    * Read and parse the client's configuration
    */
   readConfig(): ClientMcpConfig | null;
+
+  readConfigForUpdate(): ClientMcpConfig | null;
+
+  getGatewayKeys(config: ClientMcpConfig): string[];
 
   /**
    * Write configuration back to the client's config file

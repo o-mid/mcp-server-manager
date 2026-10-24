@@ -27,6 +27,8 @@ export class CursorStrategy extends JsonClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "cursor",
+    project: ".cursor/mcp.json",
     primary: {
       darwin: path.join(
         this.getHomedir(),

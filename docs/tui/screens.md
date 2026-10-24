@@ -18,7 +18,7 @@ MCP Clients:
     Zed               ✔ Installed   Disconnected
     Claude Code       ✘ Not installed
 
-  ↑↓: Navigate  |  ENTER: Toggle Connect/Disconnect  |  O: Open Config  |  R: Refresh  |  ESC: Back
+  ↑↓: Navigate  |  SPACE: Toggle Connect/Disconnect  |  S: Global/Current folder  |  O: Open Config  |  R: Refresh  |  ESC: Back
 ```
 
 ### Features
@@ -30,6 +30,7 @@ MCP Clients:
 - Disconnect clients to remove gateway server
 - Open client config files for manual editing
 - Real-time status updates
+- Switch global/current folder with `S`; status, connect/disconnect, and Open Config use the selected scope
 
 ### Gateway Pattern
 
@@ -38,14 +39,15 @@ When you connect a client:
 - A single `mcpsm` server is added to the client's config
 - This server proxies requests to `localhost:{port}/mcp`
 - All your configured servers become accessible in that client
-- Port changes automatically update all connected clients
+- Port changes update existing global gateways and registered project gateways; failed paths are reported as warnings
 
 ### Actions
 
 | Key     | Action                       |
 | ------- | ---------------------------- |
 | `↑/↓`   | Navigate between clients     |
-| `ENTER` | Toggle connect/disconnect    |
+| `SPACE` | Toggle connect/disconnect    |
+| `S`     | Switch global/current folder |
 | `O`     | Open client config in editor |
 | `R`     | Refresh detection            |
 | `ESC`   | Return to main menu          |
@@ -164,7 +166,7 @@ Settings:
 - View all application settings
 - Edit individual settings by pressing ENTER
 - Reset to defaults
-- **Automatic port updates:** When port is changed, all connected clients are automatically updated
+- **Automatic port updates:** When port is changed, global and registered project gateways are updated; failed paths are shown as warnings
 
 ### Settings
 
@@ -189,7 +191,7 @@ Settings:
 
 When you change the port setting:
 
-- ✓ All connected clients are **automatically updated**
+- ✓ All connected clients are **updated when their config is accessible**
 - ✓ The new port is written to each client's configuration
 - ✓ No need to manually edit client configs
 - ✓ Real-time loading clients (Cursor, Windsurf, VS Code, Zed) see changes without restart

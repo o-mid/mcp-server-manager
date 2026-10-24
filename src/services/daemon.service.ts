@@ -127,10 +127,7 @@ export class DaemonService {
   }
 
   /** Check if daemon is running */
-  isDaemonRunning(): DaemonStatus {
-    const configService = getConfigService();
-    const port = configService.getPort();
-
+  isDaemonRunning(port = getConfigService().getPort()): DaemonStatus {
     // Primary check: Is there a process listening on the daemon port?
     const portPids = this.findProcessesByPort(port);
     if (portPids.length === 0) {
@@ -402,8 +399,8 @@ export class DaemonService {
   }
 
   /** Ask the running daemon to refresh its configuration without restarting */
-  async refreshDaemon(): Promise<Result> {
-    const status = this.isDaemonRunning();
+  async refreshDaemon(previousPort?: number): Promise<Result> {
+    const status = this.isDaemonRunning(previousPort);
     if (!status.running || !status.pid) {
       return { success: false, error: "Daemon is not running" };
     }
@@ -436,6 +433,7 @@ export class DaemonService {
       // This is expected if daemon is slow to respond - still consider success
       const message = error instanceof Error ? error.message : String(error);
       log.debug(`Refresh signal sent but health check inconclusive: ${message}`);
+      if (previousPort !== undefined) return { success: false, error: message };
       return { success: true };
     }
   }

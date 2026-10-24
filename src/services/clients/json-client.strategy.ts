@@ -5,6 +5,7 @@
  */
 
 import fs from "fs";
+import { parseJsonWithComments } from "../../shared/json.js";
 import { BaseClientStrategy } from "./base-client.strategy.js";
 import type { ClientMcpConfig, ClientServerConfig } from "../../types/index.js";
 
@@ -41,7 +42,10 @@ export abstract class JsonClientStrategy extends BaseClientStrategy {
 
     try {
       const data = fs.readFileSync(configPath, "utf8");
-      return JSON.parse(data) as ClientMcpConfig;
+      if (this.projectDir) return parseJsonWithComments(data);
+      const config: unknown = JSON.parse(data);
+      if (!config || typeof config !== "object" || Array.isArray(config)) return null;
+      return { ...config };
     } catch (error) {
       this.log.debug(`Failed to read config from ${configPath}:`, error);
       return null;

@@ -72,4 +72,5 @@ export interface ClientMcpConfig {
 export interface OperationResult {
   success: boolean;
   error?: string;
+  warnings?: string[];
 }

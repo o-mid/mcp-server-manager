@@ -5,6 +5,7 @@
 import fs from "fs";
 import type { Settings, SettingInfo, SettingsInfo, SettingResult } from "../types/index.js";
 import { getConfigService } from "./config.service.js";
+import { validatePort } from "../shared/validators.js";
 import { createLogger } from "../shared/logger.js";
 import { protectExistingPrivateFile, writePrivateJsonFile } from "../shared/secure-storage.js";
 
@@ -85,7 +86,7 @@ export class SettingsService {
 
     // Type conversion and validation
     if (info.type === "number") {
-      const num = parseInt(String(value), 10);
+      const num = Number(value);
       if (isNaN(num)) {
         return { success: false, error: `Invalid number: ${value}` };
       }
@@ -102,6 +103,10 @@ export class SettingsService {
       };
     }
 
+    if (key === "port") {
+      const validation = validatePort(Number(parsedValue));
+      if (!validation.valid) return { success: false, error: validation.error };
+    }
     this.settings[key] = parsedValue;
     this.save();
 

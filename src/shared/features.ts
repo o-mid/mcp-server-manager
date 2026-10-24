@@ -139,6 +139,19 @@ export const FEATURES: Feature[] = [
     requiredInTui: true,
   },
   {
+    id: "clients-scope",
+    name: "Global or project client configuration",
+    category: "clients",
+    cliCommands: [
+      "clients connect --scope",
+      "clients list --scope",
+      "clients disconnect --scope",
+      "clients open --scope",
+    ],
+    tuiImplementation: "ClientsScreen.tsx (S key)",
+    requiredInTui: true,
+  },
+  {
     id: "clients-open",
     name: "Open client config",
     category: "clients",
@@ -240,10 +253,10 @@ export const FEATURES: Feature[] = [
   },
   {
     id: "settings-port",
-    name: "Configure port",
+    name: "Configure port and update global/project gateways",
     category: "settings",
-    cliCommands: ["port"],
-    tuiImplementation: "key:p",
+    cliCommands: ["port", "settings set port"],
+    tuiImplementation: "SettingsScreen.tsx",
     requiredInTui: true,
   },
 

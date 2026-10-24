@@ -9,12 +9,12 @@ import { spawnSync } from "child_process";
 import { ScreenLayout } from "../components/index.js";
 import { createMenuSections } from "../utils/menu.js";
 import { getSettingsService } from "../../services/settings.service.js";
-import { getClientService } from "../../services/client.service.js";
+import { changeGatewayPort } from "../../services/gateway-port.service.js";
 import { getConfigService } from "../../services/config.service.js";
-import type { Settings, ClientId } from "../../types/index.js";
+import type { Settings } from "../../types/index.js";
 import { useTheme } from "../theme/index.js";
 
-type View = "list" | "edit" | "confirmReset";
+type View = "list" | "edit" | "confirmReset" | "saving";
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -62,7 +62,7 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
 
   // Handle edit setting
   const handleEditSetting = useCallback(
-    (value: string) => {
+    async (value: string) => {
       const key = state.keys[state.currentIndex];
       if (!key) {
         setState((prev) => ({ ...prev, view: "list", editValue: "" }));
@@ -70,28 +70,15 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
       }
 
       if (value.trim()) {
-        const result = settingsService.set(key, value.trim());
+        setState((prev) => ({ ...prev, view: "saving" }));
+        const result = key === "port"
+          ? await changeGatewayPort(Number(value.trim()))
+          : settingsService.set(key, value.trim());
         if (result.success) {
-          showMessage(`Setting '${key}' updated`, "success");
-
-          // If port was changed, update all connected clients
-          if (key === "port") {
-            const clientService = getClientService();
-            const detectedClients = clientService.detectClients();
-            const connectedClients = detectedClients.filter((c) => c.status === "connected");
-
-            // Reconnect all clients to update the port in their configs
-            for (const client of connectedClients) {
-              clientService.disconnectClient(client.id as ClientId);
-              clientService.connectClient(client.id as ClientId);
-            }
-
-            if (connectedClients.length > 0) {
-              showMessage(
-                `Updated port for ${connectedClients.length} client${connectedClients.length === 1 ? "" : "s"}`,
-                "success"
-              );
-            }
+          if ("warnings" in result && Array.isArray(result.warnings) && result.warnings.length > 0) {
+            setState((prev) => ({ ...prev, message: result.warnings.join("; "), messageType: "info" }));
+          } else {
+            showMessage(`Setting '${key}' updated`, "success");
           }
         } else {
           showMessage(result.error || "Failed to update setting", "error");
@@ -110,10 +97,22 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
 
   // Handle reset all
   const handleResetAll = useCallback(
-    (confirm: boolean) => {
+    async (confirm: boolean) => {
       if (confirm) {
-        settingsService.reset();
-        showMessage("Settings reset to defaults", "success");
+        setState((prev) => ({ ...prev, view: "saving" }));
+        const result = await changeGatewayPort(Number(settingsService.getInfo().port.default));
+        if (result.success) {
+          try {
+            settingsService.reset();
+          } catch (error) {
+            result.warnings.push(`Port saved, but settings could not be reset: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+        if (result.warnings.length > 0) {
+          setState((prev) => ({ ...prev, message: result.warnings.join("; "), messageType: "info" }));
+        } else {
+          showMessage(result.success ? "Settings reset to defaults" : result.error || "Failed to reset settings", result.success ? "success" : "error");
+        }
         setState((prev) => ({
           ...prev,
           settings: settingsService.getAll(),
@@ -129,6 +128,7 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
   // Handle keyboard input
   useInput((input, key) => {
     const { keys, currentIndex, view, settings } = state;
+    if (view === "saving") return;
 
     // Handle confirm reset view
     if (view === "confirmReset") {
@@ -253,6 +253,10 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
     showConfig: false,
     showSystem: false,
   });
+
+  if (view === "saving") {
+    return <ScreenLayout title="Settings" menuSections={settingsMenuSections}><Text>Updating settings...</Text></ScreenLayout>;
+  }
 
   // Edit view
   if (view === "edit") {

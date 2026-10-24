@@ -13,6 +13,7 @@ export { ProfileService, getProfileService, resetProfileService } from "./profil
 
 // Client service
 export { ClientService, getClientService, resetClientService } from "./client.service.js";
+export { changeGatewayPort } from "./gateway-port.service.js";
 
 // Testing service
 export { TestingService, getTestingService, resetTestingService } from "./testing.service.js";

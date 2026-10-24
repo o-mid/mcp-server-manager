@@ -5,9 +5,19 @@
 import { Command } from "commander";
 import { colors, c } from "../../shared/colors.js";
 import { outputJson } from "../../shared/formatters.js";
-import { getClientService } from "../../services/client.service.js";
+import { ClientService, getClientService } from "../../services/client.service.js";
 import { getProfileService } from "../../services/profile.service.js";
+import { promptSelect } from "../../shared/prompts.js";
 import type { ClientId } from "../../types/index.js";
+
+type ClientScope = "global" | "project";
+
+function serviceForScope(scope?: string) {
+  if (scope && scope !== "global" && scope !== "project") {
+    throw new Error("Scope must be global or project");
+  }
+  return scope === "project" ? new ClientService(process.cwd()) : getClientService();
+}
 
 /** Register client commands */
 export function registerClientCommands(program: Command): void {
@@ -18,8 +28,9 @@ export function registerClientCommands(program: Command): void {
     .command("list", { isDefault: true })
     .description("List detected MCP clients")
     .option("--json", "Output in JSON format")
+    .option("--scope <scope>", "Configuration scope: global or project", "global")
     .action(async (options) => {
-      const clientService = getClientService();
+      const clientService = serviceForScope(options.scope);
       const detectedClients = clientService.detectClients();
 
       if (options.json) {
@@ -68,13 +79,27 @@ export function registerClientCommands(program: Command): void {
     .command("connect <client>")
     .description("Connect servers to a client")
     .option("-p, --profile <profileId>", "Connect using a specific profile")
-    .action(async (clientId: string, options: { profile?: string }) => {
-      const clientService = getClientService();
+    .option("--scope <scope>", "Configuration scope: global or project")
+    .action(async (clientId: string, options: { profile?: string; scope?: string }) => {
+      let clientService = serviceForScope(options.scope);
       const clientName = clientService.getClientName(clientId as ClientId);
 
       if (!clientService.clientExists(clientId)) {
         console.log(`${c.cross} Unknown client '${clientId}'`);
         console.log(`Available clients: ${clientService.getSupportedClients().join(", ")}`);
+        process.exit(1);
+      }
+
+      if (!options.scope && process.stdin.isTTY && clientService.supportsProjectConfig(clientId)) {
+        const scope = await promptSelect<ClientScope>("Where should the client be configured?", [
+          { label: "Global", value: "global" },
+          { label: `Current folder (${process.cwd()})`, value: "project" },
+        ]);
+        if (!scope) return;
+        clientService = serviceForScope(scope);
+      }
+      if (options.scope === "project" && !clientService.supportsProjectConfig(clientId)) {
+        console.log(`${c.cross} ${clientName} does not support project configuration`);
         process.exit(1);
       }
 
@@ -93,6 +118,8 @@ export function registerClientCommands(program: Command): void {
         console.log(`Connecting profile '${options.profile}' to ${clientName}...`);
         const result = clientService.connectClient(clientId as ClientId, options.profile);
 
+        for (const warning of result.warnings || [])
+          console.log(`${colors.yellow}${warning}${colors.reset}`);
         if (result.success) {
           console.log(`${c.checkmark} Connected profile '${options.profile}' to ${clientName}`);
         } else {
@@ -103,7 +130,11 @@ export function registerClientCommands(program: Command): void {
       }
 
       console.log(`Connecting all profiles to ${clientName}...`);
-      const { succeeded, failed } = clientService.connectAllProfiles(clientId as ClientId);
+      const { succeeded, failed, warnings } = clientService.connectAllProfiles(
+        clientId as ClientId
+      );
+      for (const warning of warnings || [])
+        console.log(`${colors.yellow}${warning}${colors.reset}`);
 
       for (const id of succeeded) {
         console.log(`  ${c.checkmark} ${id}`);
@@ -131,8 +162,9 @@ export function registerClientCommands(program: Command): void {
     .command("disconnect <client>")
     .description("Disconnect servers from a client")
     .option("-p, --profile <profileId>", "Disconnect a specific profile")
-    .action(async (clientId: string, options: { profile?: string }) => {
-      const clientService = getClientService();
+    .option("--scope <scope>", "Configuration scope: global or project", "global")
+    .action(async (clientId: string, options: { profile?: string; scope?: string }) => {
+      const clientService = serviceForScope(options.scope);
       const clientName = clientService.getClientName(clientId as ClientId);
 
       if (!clientService.clientExists(clientId)) {
@@ -150,6 +182,8 @@ export function registerClientCommands(program: Command): void {
         console.log(`Disconnecting profile '${options.profile}' from ${clientName}...`);
         const result = clientService.disconnectClient(clientId as ClientId, options.profile);
 
+        for (const warning of result.warnings || [])
+          console.log(`${colors.yellow}${warning}${colors.reset}`);
         if (result.success) {
           console.log(
             `${c.checkmark} Disconnected profile '${options.profile}' from ${clientName}`
@@ -162,7 +196,9 @@ export function registerClientCommands(program: Command): void {
       }
 
       console.log(`Disconnecting all profiles from ${clientName}...`);
-      const { failed } = clientService.disconnectAllProfiles(clientId as ClientId);
+      const { failed, warnings } = clientService.disconnectAllProfiles(clientId as ClientId);
+      for (const warning of warnings || [])
+        console.log(`${colors.yellow}${warning}${colors.reset}`);
 
       if (failed.length > 0) {
         for (const f of failed) {
@@ -179,8 +215,9 @@ export function registerClientCommands(program: Command): void {
   clients
     .command("open <client>")
     .description("Open client config in editor")
-    .action(async (clientId: string) => {
-      const clientService = getClientService();
+    .option("--scope <scope>", "Configuration scope: global or project", "global")
+    .action(async (clientId: string, options: { scope: string }) => {
+      const clientService = serviceForScope(options.scope);
 
       if (!clientService.clientExists(clientId)) {
         console.log(`${c.cross} Unknown client '${clientId}'`);

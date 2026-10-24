@@ -67,18 +67,21 @@ describe("Client review regressions", () => {
     expect(fs.readFileSync(path.join(projectDir, "opencode.json"), "utf8")).toContain("/mcp/dev");
   });
 
-  it("detects PATH executables without creating global MCP directories", () => {
-    const executable = path.join(root, "bin", "kiro");
-    write(executable, "#!/bin/sh\n");
-    fs.chmodSync(executable, 0o755);
-    const strategy = new KiroStrategy(projectDir);
-    strategy.paths.appBundles = {};
-    expect(strategy.isInstalled("linux")).toBe(true);
-    expect(strategy.connect(8850).success).toBe(true);
-    expect(fs.existsSync(path.join(scratchHome, ".kiro"))).toBe(false);
-    fs.chmodSync(executable, 0o644);
-    expect(new KiroStrategy(path.join(root, "fresh")).isInstalled("linux")).toBe(false);
-  });
+  it.skipIf(process.platform === "win32")(
+    "detects PATH executables without creating global MCP directories",
+    () => {
+      const executable = path.join(root, "bin", "kiro");
+      write(executable, "#!/bin/sh\n");
+      fs.chmodSync(executable, 0o755);
+      const strategy = new KiroStrategy(projectDir);
+      strategy.paths.appBundles = {};
+      expect(strategy.isInstalled("linux")).toBe(true);
+      expect(strategy.connect(8850).success).toBe(true);
+      expect(fs.existsSync(path.join(scratchHome, ".kiro"))).toBe(false);
+      fs.chmodSync(executable, 0o644);
+      expect(new KiroStrategy(path.join(root, "fresh")).isInstalled("linux")).toBe(false);
+    }
+  );
 
   it("honors Windows PATHEXT and rejects directories named like executables", () => {
     vi.stubEnv("PATHEXT", ".CMD;.EXE");

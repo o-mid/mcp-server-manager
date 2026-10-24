@@ -232,8 +232,7 @@ describe("SettingsScreen", () => {
       stdin.write(KEYS.ENTER);
       await waitForStateUpdate();
       stdin.write(KEYS.ENTER);
-      await waitForStateUpdate();
-      expect(lastFrame()).toContain("project config is read-only");
+      await vi.waitFor(() => expect(lastFrame()).toContain("project config is read-only"));
     });
 
     it("should show an error message when saving a setting fails", async () => {

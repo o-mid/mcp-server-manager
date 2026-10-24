@@ -63,11 +63,7 @@ describe("DoctorScreen", () => {
     it("should display health check results", async () => {
       const { lastFrame } = render(<DoctorScreen onBack={mockOnBack} />);
 
-      // Wait for async health checks
-      await waitForStateUpdate(200);
-
-      const frame = lastFrame();
-      expect(frame).toContain("Node.js");
+      await vi.waitFor(() => expect(lastFrame()).toContain("Node.js"));
     });
 
     it("should show Node.js version", async () => {

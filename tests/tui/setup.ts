@@ -3,10 +3,12 @@
  */
 
 import React from "react";
-import { vi } from "vitest";
-import { render as inkRender } from "ink-testing-library";
+import { afterEach, vi } from "vitest";
+import { cleanup, render as inkRender } from "ink-testing-library";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "../../src/tui/theme/ThemeContext.js";
+
+afterEach(cleanup);
 
 // Create a fresh QueryClient for each test
 const createTestQueryClient = (): QueryClient =>

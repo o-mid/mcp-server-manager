@@ -73,7 +73,7 @@ describe("ZedStrategy", () => {
       expect(strategy.readConfig()).toBeNull();
       expect(strategy.connect(8850).success).toBe(false);
       expect(fs.readFileSync(configPath, "utf8")).toBe(input);
-      expect(strategy.disconnect().success).toBe(true);
+      expect(strategy.disconnect().success).toBe(false);
       expect(fs.readFileSync(configPath, "utf8")).toBe(input);
     }
   );

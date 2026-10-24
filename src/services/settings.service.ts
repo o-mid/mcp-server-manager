@@ -80,7 +80,7 @@ export class SettingsService {
 
     // Type conversion and validation
     if (info.type === "number") {
-      const num = parseInt(String(value), 10);
+      const num = Number(value);
       if (isNaN(num)) {
         return { success: false, error: `Invalid number: ${value}` };
       }

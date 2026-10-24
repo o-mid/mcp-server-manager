@@ -25,6 +25,8 @@ export class GeminiStrategy extends JsonClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "gemini",
+    project: ".gemini/settings.json",
     primary: {
       darwin: path.join(this.getHomedir(), ".gemini/settings.json"),
       win32: path.join(this.getHomedir(), ".gemini/settings.json"),

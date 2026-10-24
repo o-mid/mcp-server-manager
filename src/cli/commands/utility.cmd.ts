@@ -1,4 +1,3 @@
-import { updateGatewayPort } from "../../services/port.service.js";
 import { runDoctorChecks } from "../../services/doctor.service.js";
 /**
  * Utility commands - doctor, config, tokens
@@ -9,6 +8,7 @@ import { spawnSync } from "child_process";
 import { colors, c } from "../../shared/colors.js";
 import { formatTokens, outputJson } from "../../shared/formatters.js";
 import { getConfigService } from "../../services/config.service.js";
+import { changeGatewayPort } from "../../services/gateway-port.service.js";
 import { getSettingsService } from "../../services/settings.service.js";
 import { VERSION } from "../../shared/version.js";
 
@@ -214,7 +214,7 @@ export function registerUtilityCommands(program: Command): void {
         process.exit(1);
       }
 
-      const result = await updateGatewayPort(port);
+      const result = await changeGatewayPort(port);
       if (!result.success) {
         console.error("Port is " + result.port + ": " + result.error);
         process.exitCode = 1;
@@ -222,5 +222,7 @@ export function registerUtilityCommands(program: Command): void {
       }
 
       console.log(`${c.checkmark} Port set to ${port}`);
+      for (const warning of result.warnings)
+        console.log(`${colors.yellow}${warning}${colors.reset}`);
     });
 }

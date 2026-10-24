@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { updateGatewayPort } from "../src/services/port.service.js";
+import { changeGatewayPort } from "../src/services/gateway-port.service.js";
 
 const mocks = vi.hoisted(() => ({
   port: 8850,
@@ -12,8 +12,20 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../src/services/config.service.js", () => ({
   getConfigService: vi.fn(() => ({ getPort: vi.fn(() => mocks.port), setPort: mocks.setPort })),
 }));
-vi.mock("../src/services/client.service.js", () => ({
-  getClientService: vi.fn(() => ({ updateConnectedGatewayPorts: mocks.clients })),
+vi.mock("../src/services/clients/index.js", () => ({
+  getRegisteredClientIds: () => ["codex"],
+  getClientStrategy: () => ({
+    getEffectiveConfigPath: () => "/client-config",
+    readConfigForUpdate: () => ({}),
+    updateGatewayPort: mocks.clients,
+  }),
+}));
+vi.mock("../src/services/project-connections.service.js", () => ({
+  ProjectConnectionsService: class {
+    list() {
+      return [];
+    }
+  },
 }));
 vi.mock("../src/services/daemon.service.js", () => ({
   getDaemonService: vi.fn(() => ({
@@ -31,7 +43,7 @@ describe("gateway port coordination", () => {
       mocks.port = port;
       return { success: true };
     });
-    mocks.clients.mockReturnValue([]);
+    mocks.clients.mockReturnValue({ success: true });
     mocks.status.mockReturnValue({ running: false });
     mocks.health.mockResolvedValue({ status: "ok" });
     mocks.refresh.mockResolvedValue({ success: true });
@@ -39,7 +51,7 @@ describe("gateway port coordination", () => {
   it.each(["9000abc", "9000.2", "", [9000], true, 0, 65536, NaN])(
     "rejects %j before external effects",
     async (value) => {
-      await expect(Reflect.apply(updateGatewayPort, undefined, [value])).resolves.toMatchObject({
+      await expect(Reflect.apply(changeGatewayPort, undefined, [value])).resolves.toMatchObject({
         success: false,
         port: 8850,
       });
@@ -49,7 +61,7 @@ describe("gateway port coordination", () => {
     }
   );
   it("updates a stopped daemon's configuration without starting it", async () => {
-    await expect(updateGatewayPort(9100)).resolves.toMatchObject({ success: true, port: 9100 });
+    await expect(changeGatewayPort(9100)).resolves.toMatchObject({ success: true, port: 9100 });
     expect(mocks.clients).toHaveBeenCalledWith(9100);
     expect(mocks.refresh).not.toHaveBeenCalled();
   });
@@ -59,12 +71,14 @@ describe("gateway port coordination", () => {
       return { running: true, pid: 123 };
     });
     mocks.refresh.mockResolvedValue({ success: false, error: "readiness timed out" });
-    mocks.clients.mockReturnValue([{ clientId: "codex", error: "read only" }]);
-    await expect(updateGatewayPort(9100)).resolves.toMatchObject({
+    mocks.clients.mockReturnValue({ success: false, error: "read only" });
+    await expect(changeGatewayPort(9100)).resolves.toMatchObject({
       success: false,
       port: 9100,
-      daemonError: "readiness timed out",
-      clientErrors: [{ clientId: "codex", error: "read only" }],
+      warnings: [
+        expect.stringContaining("read only"),
+        expect.stringContaining("readiness timed out"),
+      ],
     });
     expect(mocks.refresh).toHaveBeenCalledWith({ running: true, pid: 123 }, true);
     expect(mocks.port).toBe(9100);
@@ -73,17 +87,17 @@ describe("gateway port coordination", () => {
     mocks.setPort.mockImplementationOnce(() => {
       throw new Error("write failed");
     });
-    await expect(updateGatewayPort(9100)).resolves.toMatchObject({ success: false, port: 8850 });
+    await expect(changeGatewayPort(9100)).resolves.toMatchObject({ success: false, port: 8850 });
     expect(mocks.clients).not.toHaveBeenCalled();
   });
 
   it("retries a daemon refresh when the requested port was already saved", async () => {
     mocks.status.mockReturnValue({ running: true, pid: 123 });
     mocks.refresh.mockResolvedValueOnce({ success: false, error: "refresh failed" });
-    await expect(updateGatewayPort(9100)).resolves.toMatchObject({ success: false, port: 9100 });
+    await expect(changeGatewayPort(9100)).resolves.toMatchObject({ success: false, port: 9100 });
 
     mocks.health.mockResolvedValue({ status: "error" });
-    await expect(updateGatewayPort(9100)).resolves.toMatchObject({ success: true, port: 9100 });
+    await expect(changeGatewayPort(9100)).resolves.toMatchObject({ success: true, port: 9100 });
     expect(mocks.refresh).toHaveBeenCalledTimes(2);
     expect(mocks.refresh).toHaveBeenLastCalledWith({ running: true, pid: 123 }, true);
   });
@@ -96,15 +110,15 @@ describe("gateway port coordination", () => {
           ready = (): void => resolve({ success: true });
         })
     );
-    const first = updateGatewayPort(9100);
-    const second = updateGatewayPort(9200);
+    const first = changeGatewayPort(9100);
+    const second = changeGatewayPort(9200);
     await vi.waitFor(() => expect(ready).toBeDefined());
     expect(mocks.port).toBe(9100);
     ready?.();
     await Promise.all([first, second]);
     expect(mocks.clients.mock.calls).toEqual([[9100], [9200]]);
     mocks.refresh.mockClear();
-    await updateGatewayPort(9200);
+    await changeGatewayPort(9200);
     expect(mocks.clients).toHaveBeenLastCalledWith(9200);
     expect(mocks.refresh).not.toHaveBeenCalled();
   });

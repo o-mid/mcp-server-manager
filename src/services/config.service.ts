@@ -168,6 +168,10 @@ export class ConfigService {
     this.toolFilterService.disableTool(filterId, toolName);
   }
 
+  setToolsEnabled(filterId: string, toolNames: string[], enabled: boolean): void {
+    this.toolFilterService.setToolsEnabled(filterId, toolNames, enabled);
+  }
+
   enableAllTools(filterId: string): void {
     this.toolFilterService.enableAllTools(filterId);
   }

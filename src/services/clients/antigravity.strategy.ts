@@ -27,6 +27,8 @@ export class AntigravityStrategy extends JsonClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "antigravity",
+    project: ".agents/mcp_config.json",
     primary: {
       darwin: path.join(this.getHomedir(), ".antigravity/mcp_config.json"),
       win32: path.join(this.getHomedir(), ".antigravity/mcp_config.json"),
@@ -39,6 +41,7 @@ export class AntigravityStrategy extends JsonClientStrategy {
 
   buildGatewayConfig(port: number, profileId?: string): ClientServerConfig {
     const mcpPath = profileId ? `/mcp/${profileId}` : "/mcp";
+    if (this.projectDir) return super.buildGatewayConfig(port, profileId);
     return {
       url: `http://localhost:${port}${mcpPath}`,
     };

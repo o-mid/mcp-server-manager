@@ -86,6 +86,7 @@ mcpsm test
 
 # Connect a client
 mcpsm clients connect claude
+mcpsm clients connect cursor --scope project
 ```
 
 For complete command reference and guides, see the **[documentation](https://sardine-ai.github.io/mcp-server-manager/guide/getting-started.html)**.

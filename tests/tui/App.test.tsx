@@ -409,7 +409,7 @@ describe("App Component", () => {
     beforeEach(() => {
       mockConfigService.getLocalServers.mockReturnValue(sampleLocalServers);
       mockConfigService.getToolFilters.mockReturnValue({
-        server1: { allTools: ["t1", "t2", "t3"], enabled: ["t1", "t2"] },
+        server1: { allTools: ["t1", "t2", "t3"], disabledTools: ["t3"] },
       });
     });
 

@@ -109,6 +109,17 @@ describe("TestingService unit coverage", () => {
     resetTestingService();
   });
 
+  it("stores tool annotations from discovered tools", async () => {
+    connectionMocks.listTools.mockResolvedValue({
+      tools: [{ name: "search", annotations: { readOnlyHint: true } }, { name: "plain" }],
+    });
+    await service.testLocalServer(localServer());
+    expect(configMocks.toolFilters.local.toolsData.search.annotations).toEqual({
+      readOnlyHint: true,
+    });
+    expect(configMocks.toolFilters.local.toolsData.plain.annotations).toBeUndefined();
+  });
+
   it.each(["local", "http", "sse"])(
     "discovers %s tools and preserves disabled tools",
     async (type) => {

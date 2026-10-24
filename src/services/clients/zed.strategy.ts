@@ -1,10 +1,10 @@
-import { parse, type ParseError } from "jsonc-parser";
 /**
  * Zed Strategy - Strategy for Zed editor
  * Uses settings.json with context_servers entries
  */
 
 import fs from "fs";
+import { parseJsonWithComments } from "../../shared/json.js";
 import path from "path";
 import { BaseClientStrategy } from "./base-client.strategy.js";
 import type {
@@ -28,18 +28,6 @@ function getGatewayId(profileId?: string): string {
   return profileId ? `mcpsm-${profileId}` : "mcpsm";
 }
 
-function parseJsonWithComments(input: string): ZedConfig | null {
-  const errors: ParseError[] = [];
-  const parsed: unknown = parse(input, errors, {
-    allowTrailingComma: true,
-    disallowComments: false,
-  });
-  if (errors.length || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return null;
-  }
-  return parsed as ZedConfig;
-}
-
 export class ZedStrategy extends BaseClientStrategy {
   readonly metadata: ClientMetadata = {
     id: "zed",
@@ -55,6 +43,8 @@ export class ZedStrategy extends BaseClientStrategy {
   };
 
   readonly paths: ClientPlatformPaths = {
+    executable: "zed",
+    project: ".zed/settings.json",
     primary: {
       darwin: path.join(this.getHomedir(), ".config/zed/settings.json"),
       win32: path.join(this.getAppData(), "Zed/settings.json"),
@@ -76,17 +66,6 @@ export class ZedStrategy extends BaseClientStrategy {
     servers: Record<string, ClientServerConfig>
   ): ClientMcpConfig {
     return { ...config, context_servers: servers };
-  }
-
-  connect(port: number, profileId?: string): { success: boolean; error?: string } {
-    const configPath = this.getEffectiveConfigPath(this.getPlatform());
-    if (configPath && fs.existsSync(configPath) && !this.readConfig()) {
-      return {
-        success: false,
-        error: "Cannot connect: invalid or unreadable config at " + configPath,
-      };
-    }
-    return super.connect(port, profileId);
   }
 
   readConfig(): ClientMcpConfig | null {
@@ -153,9 +132,10 @@ export class ZedStrategy extends BaseClientStrategy {
     const contextServers = zedConfig.context_servers ?? {};
     const gatewayId = getGatewayId(profileId);
     const gatewayConfig: ZedContextServer = {
-      ...(this.buildGatewayConfig(port, profileId) as ZedContextServer),
-      headers: {},
-      settings: {},
+      ...contextServers[gatewayId],
+      ...this.buildGatewayConfig(port, profileId),
+      headers: contextServers[gatewayId]?.headers || {},
+      settings: contextServers[gatewayId]?.settings || {},
     };
 
     return {

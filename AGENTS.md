@@ -115,6 +115,7 @@ All business logic is encapsulated in singleton services:
 - `tool-filters.json` - Per-server tool enable/disable settings
 - `settings.json` - App settings (editor); gateway port is canonical in `config.json`
 - `profiles.json` - Profile definitions
+- `clients.json` - Registered project/client locations for port updates
 
 ### Client Configuration Files
 
@@ -192,7 +193,7 @@ mcpsm edit <server>                Edit server
 mcpsm test [server]                Test server(s)
 mcpsm import [file]                Import servers from file or client
 mcpsm export                        Export server configuration
-mcpsm clients [list|connect|disconnect|open]
+mcpsm clients [list|connect|disconnect|open] [--scope global|project]
 mcpsm profile [list|create|clone|delete|rename|use|add|remove]
 mcpsm settings [list|get|set|reset]
 mcpsm tools [list|discover|enable|disable]
@@ -338,7 +339,8 @@ When conflicts are detected between imported and existing servers:
 ### Important Notes on Port Changes
 
 - When port is changed in Settings (G), all connected clients are **automatically updated**
-- CLI port/settings commands and TUI settings share `updateGatewayPort`; low-level setters only persist storage
-- Existing bare/profile gateway addresses are updated in place; disconnected profiles remain disconnected
+- CLI port/settings commands and TUI settings share `changeGatewayPort`; low-level setters only persist storage
+- Existing global and registered project gateway addresses are updated in place; disconnected profiles remain disconnected
+- Clients screen: `S` switches global/current folder; Space toggles the selected profile. Status and config actions use that scope.
 - A running daemon is signaled using its captured PID; failures report the saved port and affected targets
 - No client restart required for real-time loading clients (Cursor, Windsurf, VS Code)

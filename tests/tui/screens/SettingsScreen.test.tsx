@@ -5,7 +5,8 @@
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { spawnSync } from "child_process";
-import { updateGatewayPort } from "../../../src/services/port.service.js";
+import type { PortUpdateResult } from "../../../src/services/gateway-port.service.js";
+import { changeGatewayPort } from "../../../src/services/gateway-port.service.js";
 import { render } from "../setup.js";
 import {
   mockClientService,
@@ -17,8 +18,11 @@ import {
 } from "../setup.js";
 
 // Setup mocks before importing component
-vi.mock("../../../src/services/port.service.js", () => ({
-  updateGatewayPort: vi.fn(async () => ({ success: true, port: 8850, clientErrors: [] })),
+vi.mock("../../../src/services/gateway-port.service.js", () => ({
+  changeGatewayPort: vi.fn(async () => {
+    const result: PortUpdateResult = { success: true, port: 8850, warnings: [] };
+    return result;
+  }),
 }));
 
 vi.mock("../../../src/services/settings.service.js", () => ({
@@ -44,6 +48,7 @@ describe("SettingsScreen", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(changeGatewayPort).mockResolvedValue({ success: true, port: 8850, warnings: [] });
     mockSettingsService.getAll.mockReturnValue({ ...mockSettings });
     mockSettingsService.getKeys.mockReturnValue(
       Object.keys(mockSettings) as (keyof typeof mockSettings)[]
@@ -224,9 +229,24 @@ describe("SettingsScreen", () => {
       stdin.write(KEYS.ENTER);
       await waitForStateUpdate();
 
-      expect(updateGatewayPort).toHaveBeenCalledWith(8850);
+      expect(changeGatewayPort).toHaveBeenCalledWith(8850);
       expect(mockClientService.disconnectClient).not.toHaveBeenCalled();
       expect(lastFrame()).toContain("Setting updated");
+    });
+
+    it("keeps partial port-update errors visible", async () => {
+      vi.mocked(changeGatewayPort).mockResolvedValueOnce({
+        success: false,
+        port: 8850,
+        warnings: ["project config is read-only"],
+        error: "project config is read-only",
+      });
+      const { stdin, lastFrame } = render(<SettingsScreen onBack={mockOnBack} initialKey="port" />);
+      stdin.write(KEYS.ENTER);
+      await waitForStateUpdate();
+      stdin.write(KEYS.ENTER);
+      await waitForStateUpdate();
+      expect(lastFrame()).toContain("project config is read-only");
     });
 
     it("should show an error message when saving a setting fails", async () => {

@@ -51,13 +51,13 @@ Available on all screens:
 
 ## Tool Filters Screen
 
-| Key       | Action            |
-| --------- | ----------------- |
-| `↑` / `↓` | Navigate tools    |
-| `SPACE`   | Toggle tool       |
-| `A`       | Enable all tools  |
-| `N`       | Disable all tools |
-| `ESC`     | Save and return   |
+| Key       | Action               |
+| --------- | -------------------- |
+| `↑` / `↓` | Navigate tools       |
+| `SPACE`   | Toggle tool or group |
+| `A`       | Enable all tools     |
+| `N`       | Disable all tools    |
+| `ESC`     | Save and return      |
 
 ---
 
@@ -66,9 +66,12 @@ Available on all screens:
 | Key     | Action                                       |
 | ------- | -------------------------------------------- |
 | `↑/↓`   | Navigate between clients                     |
-| `ENTER` | Toggle connect/disconnect for current client |
+| `SPACE` | Toggle connect/disconnect for current client |
+| `S`     | Switch global/current folder                 |
 | `R`     | Refresh detected clients                     |
 | `ESC`   | Return to main menu                          |
+
+Status, connect/disconnect, and config actions use the selected scope.
 
 ---
 

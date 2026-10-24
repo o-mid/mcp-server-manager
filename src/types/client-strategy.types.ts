@@ -43,6 +43,8 @@ export interface ClientCapabilities {
 export interface ClientPlatformPaths {
   /** Primary config path per platform */
   primary: Partial<Record<Platform, string>>;
+  project?: string;
+  executable?: string;
   /** Secondary (real-time) config path, if applicable */
   secondary?: string | null;
   /** App bundle paths for installation detection (macOS) */
@@ -108,6 +110,10 @@ export interface IClientStrategy {
    */
   readConfig(): ClientMcpConfig | null;
 
+  readConfigForUpdate(): ClientMcpConfig | null;
+
+  getGatewayKeys(config: ClientMcpConfig): string[];
+
   /**
    * Write configuration back to the client's config file
    */
@@ -137,11 +143,11 @@ export interface IClientStrategy {
 
   // === High-Level Operations ===
 
+  updateGatewayPort(port: number): OperationResult;
+
   /**
    * Connect the client to MCPSM
    */
-  updateGatewayPort(port: number): OperationResult;
-
   connect(port: number, profileId?: string): OperationResult;
 
   /**

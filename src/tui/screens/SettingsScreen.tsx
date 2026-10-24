@@ -9,12 +9,12 @@ import { spawnSync } from "child_process";
 import { ScreenLayout } from "../components/index.js";
 import { createMenuSections } from "../utils/menu.js";
 import { getSettingsService } from "../../services/settings.service.js";
-import { updateGatewayPort } from "../../services/port.service.js";
+import { changeGatewayPort } from "../../services/gateway-port.service.js";
 import { getConfigService } from "../../services/config.service.js";
 import type { Settings } from "../../types/index.js";
 import { useTheme } from "../theme/index.js";
 
-type View = "list" | "edit" | "confirmReset";
+type View = "list" | "edit" | "confirmReset" | "saving";
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -37,10 +37,13 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
   const configService = getConfigService();
   const mounted = useRef(true);
   const messageTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => {
-    mounted.current = false;
-    clearTimeout(messageTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      mounted.current = false;
+      clearTimeout(messageTimer.current);
+    },
+    []
+  );
 
   const allKeys = settingsService.getKeys();
   const initialIndex = initialKey ? Math.max(0, allKeys.indexOf(initialKey)) : 0;
@@ -57,10 +60,11 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
 
   // Show temporary message
   const showMessage = useCallback(
-    (msg: string, type: "success" | "error" | "info" = "info") => {
+    (msg: string, type: "success" | "error" | "info" = "info", persistent = false) => {
       if (!mounted.current) return;
       clearTimeout(messageTimer.current);
       setState((prev) => ({ ...prev, message: msg, messageType: type }));
+      if (persistent) return;
       messageTimer.current = setTimeout(() => {
         setState((prev) => ({ ...prev, message: null }));
       }, 2000);
@@ -78,12 +82,17 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
       }
 
       if (value.trim()) {
+        setState((prev) => ({ ...prev, view: "saving" }));
         try {
-          const result = key === "port"
-            ? await updateGatewayPort(Number(value))
-            : settingsService.set(key, value.trim());
-          showMessage(result.success ? "Setting updated" : result.error || "Failed to update setting",
-            result.success ? "success" : "error");
+          const result =
+            key === "port"
+              ? await changeGatewayPort(Number(value))
+              : settingsService.set(key, value.trim());
+          showMessage(
+            result.success ? "Setting updated" : result.error || "Failed to update setting",
+            result.success ? "success" : "error",
+            "warnings" in result && result.warnings.length > 0
+          );
         } catch (error) {
           showMessage(error instanceof Error ? error.message : String(error), "error");
         }
@@ -104,11 +113,17 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
   const handleResetAll = useCallback(
     async (confirm: boolean) => {
       if (confirm) {
+        setState((prev) => ({ ...prev, view: "saving" }));
         try {
-          const result = await updateGatewayPort(Number(settingsService.getInfo().port.default));
-          settingsService.reset();
-          showMessage(result.success ? "Settings reset to defaults" : result.error || "Port update incomplete",
-            result.success ? "success" : "error");
+          const result = await changeGatewayPort(Number(settingsService.getInfo().port.default));
+          if (result.success) settingsService.reset();
+          showMessage(
+            result.success
+              ? "Settings reset to defaults"
+              : result.error || "Port update incomplete",
+            result.success ? "success" : "error",
+            result.warnings.length > 0
+          );
         } catch (error) {
           showMessage(error instanceof Error ? error.message : String(error), "error");
         }
@@ -128,6 +143,7 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
   // Handle keyboard input
   useInput((input, key) => {
     const { keys, currentIndex, view, settings } = state;
+    if (view === "saving") return;
 
     // Handle confirm reset view
     if (view === "confirmReset") {
@@ -253,6 +269,14 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
     showSystem: false,
   });
 
+  if (view === "saving") {
+    return (
+      <ScreenLayout title="Settings" menuSections={settingsMenuSections}>
+        <Text>Updating settings...</Text>
+      </ScreenLayout>
+    );
+  }
+
   // Edit view
   if (view === "edit") {
     const settingKey = keys[currentIndex];
@@ -296,7 +320,15 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
     <ScreenLayout title="Settings" menuSections={settingsMenuSections}>
       {message && (
         <Box marginBottom={1}>
-          <Text color={messageType === "success" ? theme.colors.success : messageType === "error" ? theme.colors.error : theme.colors.warning}>
+          <Text
+            color={
+              messageType === "success"
+                ? theme.colors.success
+                : messageType === "error"
+                  ? theme.colors.error
+                  : theme.colors.warning
+            }
+          >
             {messageType === "success" ? "✓" : messageType === "error" ? "✗" : "ℹ"} {message}
           </Text>
         </Box>
@@ -310,7 +342,11 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
 
         let valueDisplay: React.ReactElement;
         if (typeof value === "boolean") {
-          valueDisplay = <Text color={value ? theme.colors.success : theme.colors.error}>{value ? "true" : "false"}</Text>;
+          valueDisplay = (
+            <Text color={value ? theme.colors.success : theme.colors.error}>
+              {value ? "true" : "false"}
+            </Text>
+          );
         } else {
           valueDisplay = <Text color={theme.colors.primary}>{String(value)}</Text>;
         }
@@ -318,7 +354,9 @@ export function SettingsScreen({ onBack, initialKey }: SettingsScreenProps): Rea
         return (
           <Box key={settingKey} flexDirection="column" marginBottom={1}>
             <Box gap={1}>
-              <Text color={isCurrent ? theme.colors.highlightText : theme.colors.border}>{isCurrent ? "→" : " "}</Text>
+              <Text color={isCurrent ? theme.colors.highlightText : theme.colors.border}>
+                {isCurrent ? "→" : " "}
+              </Text>
               <Text color={isCurrent ? theme.colors.highlightText : undefined} bold={isCurrent}>
                 {settingKey}:
               </Text>

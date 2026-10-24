@@ -112,6 +112,14 @@ export const FEATURES: Feature[] = [
     tuiImplementation: "ToolsScreen.tsx",
     requiredInTui: true,
   },
+  {
+    id: "tools-group-toggle",
+    name: "Enable/disable read-only or destructive tools",
+    category: "tools",
+    cliCommands: ["tools enable --read-only", "tools disable --destructive"],
+    tuiImplementation: "ToolsScreen.tsx",
+    requiredInTui: true,
+  },
 
   // === Clients ===
   {
@@ -128,6 +136,19 @@ export const FEATURES: Feature[] = [
     category: "clients",
     cliCommands: ["clients connect", "clients disconnect"],
     tuiImplementation: "ClientsScreen.tsx",
+    requiredInTui: true,
+  },
+  {
+    id: "clients-scope",
+    name: "Global or project client configuration",
+    category: "clients",
+    cliCommands: [
+      "clients connect --scope",
+      "clients list --scope",
+      "clients disconnect --scope",
+      "clients open --scope",
+    ],
+    tuiImplementation: "ClientsScreen.tsx (S key)",
     requiredInTui: true,
   },
   {
@@ -232,10 +253,10 @@ export const FEATURES: Feature[] = [
   },
   {
     id: "settings-port",
-    name: "Configure port",
+    name: "Configure port and update global/project gateways",
     category: "settings",
-    cliCommands: ["port"],
-    tuiImplementation: "key:p",
+    cliCommands: ["port", "settings set port"],
+    tuiImplementation: "SettingsScreen.tsx",
     requiredInTui: true,
   },
 

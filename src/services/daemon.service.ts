@@ -145,10 +145,7 @@ export class DaemonService {
   }
 
   /** Check if daemon is running */
-  isDaemonRunning(): DaemonStatus {
-    const configService = getConfigService();
-    const port = configService.getPort();
-
+  isDaemonRunning(port = getConfigService().getPort()): DaemonStatus {
     // Primary check: Is there a process listening on the daemon port?
     const portPids = this.findProcessesByPort(port);
     if (portPids.length === 0) {

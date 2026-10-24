@@ -89,8 +89,8 @@ describe("AuthScreen", () => {
 
   it("goes back on ESC", async () => {
     const onBack = vi.fn();
-    const { stdin, lastFrame } = render(<AuthScreen onBack={onBack} />);
-    await vi.waitFor(() => expect(lastFrame()).toContain("Remote One"));
+    const { stdin } = render(<AuthScreen onBack={onBack} />);
+    await vi.waitFor(() => expect(stdin.listenerCount("readable")).toBeGreaterThan(0));
     stdin.write(KEYS.ESCAPE);
     await vi.waitFor(() => expect(onBack).toHaveBeenCalled());
   });

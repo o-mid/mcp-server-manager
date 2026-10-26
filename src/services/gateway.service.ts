@@ -23,7 +23,11 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import type { Tool, CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  ListToolsResultSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import { getConfigService } from "./config.service.js";
 import { getAuthService } from "./auth.service.js";
 import { getEnvironmentService } from "./environment.service.js";
@@ -181,6 +185,14 @@ async function reconnectServer(serverId: string): Promise<void> {
 }
 
 /**
+ * List tools without compiling output schemas.
+ * Client.listTools() fails the connection when an outputSchema $ref cannot be resolved.
+ */
+async function listGatewayTools(client: Client) {
+  return client.request({ method: "tools/list" }, ListToolsResultSchema);
+}
+
+/**
  * Connect to a local STDIO-based MCP server
  */
 async function connectLocalServer(server: LocalServer): Promise<ConnectedServer | null> {
@@ -215,7 +227,7 @@ async function connectLocalServer(server: LocalServer): Promise<ConnectedServer 
     await client.connect(transport);
 
     // Get available tools
-    const toolsResult = await client.listTools();
+    const toolsResult = await listGatewayTools(client);
     const allTools = toolsResult.tools || [];
 
     // Apply tool filtering
@@ -287,7 +299,7 @@ async function connectRemoteServer(server: RemoteServer): Promise<ConnectedServe
     await client.connect(transport);
 
     // Get available tools
-    const toolsResult = await client.listTools();
+    const toolsResult = await listGatewayTools(client);
     const allTools = toolsResult.tools || [];
 
     // Apply tool filtering
@@ -965,7 +977,7 @@ export async function refreshGatewayTools(
     const refreshResults = await Promise.all(
       servers.map(async (server) => {
         try {
-          const toolsResult = await server.client.listTools();
+          const toolsResult = await listGatewayTools(server.client);
           const allTools = toolsResult.tools || [];
           const disabledTools = new Set(toolFilters[server.id]?.disabledTools || []);
           server.tools = allTools.filter((tool) => !disabledTools.has(tool.name));

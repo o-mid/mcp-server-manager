@@ -7,7 +7,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { ListToolsRequestSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import {
   getGatewayStatus,
   refreshGatewayTools,
@@ -21,6 +21,13 @@ const unresolvedOutputSchema = {
   type: "object" as const,
   properties: {
     screen: { $ref: "#/$defs/ScreenInstance" },
+  },
+};
+
+const validOutputSchema = {
+  type: "object" as const,
+  properties: {
+    query: { type: "string" as const },
   },
 };
 
@@ -65,12 +72,21 @@ function createUpstreamServer(): Server {
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: [
       {
+        name: "search",
+        description: "Search",
+        inputSchema: { type: "object" as const, properties: {} },
+        outputSchema: validOutputSchema,
+      },
+      {
         name: "list_projects",
         description: "List projects",
         inputSchema: { type: "object" as const, properties: {} },
         outputSchema: unresolvedOutputSchema,
       },
     ],
+  }));
+  server.setRequestHandler(CallToolRequestSchema, async (request) => ({
+    content: [{ type: "text" as const, text: `called ${request.params.name}` }],
   }));
   return server;
 }
@@ -170,7 +186,7 @@ describe("Gateway unresolved output schemas", () => {
     ]);
 
     await expect(startGateway(["remote:stitch"])).resolves.toEqual({ success: true });
-    expect(getGatewayStatus()).toMatchObject({ serverCount: 1, toolCount: 1 });
+    expect(getGatewayStatus()).toMatchObject({ serverCount: 1, toolCount: 2 });
 
     const client = new Client({ name: "gateway-test", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(
@@ -181,15 +197,19 @@ describe("Gateway unresolved output schemas", () => {
       await client.close();
     });
 
-    const listed = await client.request({ method: "tools/list" }, ListToolsResultSchema);
-    expect(listed.tools).toEqual([
-      expect.objectContaining({
-        name: "stitch__list_projects",
-        outputSchema: expect.objectContaining({
-          properties: { screen: { $ref: "#/$defs/ScreenInstance" } },
-        }),
-      }),
-    ]);
+    const listed = await client.listTools();
+    const byName = new Map(listed.tools.map((tool) => [tool.name, tool]));
+    expect([...byName.keys()].sort()).toEqual(["stitch__list_projects", "stitch__search"]);
+    expect(byName.get("stitch__search")?.outputSchema).toMatchObject({
+      properties: { query: { type: "string" } },
+    });
+    expect(byName.get("stitch__list_projects")?.outputSchema).toBeUndefined();
+
+    const called = await client.callTool({
+      name: "stitch__list_projects",
+      arguments: {},
+    });
+    expect(called.content).toEqual([{ type: "text", text: "called list_projects" }]);
   });
 
   it("refreshes tools when a connected server returns an unresolved output schema", async () => {
@@ -221,6 +241,6 @@ describe("Gateway unresolved output schemas", () => {
     });
 
     await expect(refreshGatewayTools("test")).resolves.toEqual({ success: true });
-    expect(getGatewayStatus()).toMatchObject({ serverCount: 1, toolCount: 1 });
+    expect(getGatewayStatus()).toMatchObject({ serverCount: 1, toolCount: 2 });
   });
 });
